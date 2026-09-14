@@ -7,6 +7,11 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Lockfiles (avoid cross-platform npm ci / bun mismatch on CI)
+package-lock.json
+bun.lock
+bun.lockb
+
 node_modules
 dist
 dist-ssr
