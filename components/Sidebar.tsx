@@ -256,27 +256,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Install Instructions Guide Modal */}
         {showInstallGuide && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in" dir={isRtl ? 'rtl' : 'ltr'}>
+          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-in fade-in" dir={isRtl ? 'rtl' : 'ltr'}>
             <div className="w-full max-w-md rounded-3xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-6 shadow-2xl animate-in zoom-in-95 text-right">
+              {/* Header */}
               <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-lg">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/80 flex items-center justify-center font-bold text-xl shrink-0">
                     📱
                   </div>
                   <div>
                     <h3 className="text-base font-black text-gray-900 dark:text-white">
                       {language === 'ar' ? 'تثبيت التطبيق على الهاتف' : "Installer l'application"}
                     </h3>
-                    <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                    <p className="text-[11px] font-medium text-gray-600 dark:text-gray-400">
                       {language === 'ar' ? 'يعمل كتطبيق أصلي سريع وبدون إنترنت' : 'Fonctionne hors ligne comme une app native'}
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => setShowInstallGuide(false)}
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+                  className="p-1.5 rounded-xl text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition cursor-pointer"
+                  title={language === 'ar' ? 'إغلاق' : 'Fermer'}
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
@@ -287,9 +289,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   type="button"
                   onClick={() => window.open(window.location.href, '_blank')}
-                  className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black text-xs hover:from-emerald-700 hover:to-teal-700 shadow-md shadow-emerald-600/20 transition flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs shadow-md shadow-emerald-600/20 active:scale-[0.99] transition flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                   </svg>
                   <span>{language === 'ar' ? 'فتح في نافذة كاملة للتثبيت التلقائي' : 'Ouvrir en plein écran pour installer'}</span>
@@ -297,14 +299,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
 
               {/* Tabs: Android vs iOS */}
-              <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-1 mb-4">
+              <div className="flex rounded-xl bg-gray-100 dark:bg-gray-800 p-1 mb-4 border border-gray-200 dark:border-gray-700">
                 <button
                   type="button"
                   onClick={() => setGuideTab('android')}
-                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                     guideTab === 'android'
-                      ? 'bg-white dark:bg-gray-700 text-emerald-600 dark:text-emerald-400 shadow-xs'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'
+                      ? 'bg-emerald-600 text-white shadow-sm font-black'
+                      : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
                   }`}
                 >
                   {language === 'ar' ? 'هواتف أندرويد (Chrome)' : 'Android (Chrome)'}
@@ -312,57 +314,138 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   type="button"
                   onClick={() => setGuideTab('ios')}
-                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                     guideTab === 'ios'
-                      ? 'bg-white dark:bg-gray-700 text-emerald-600 dark:text-emerald-400 shadow-xs'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'
+                      ? 'bg-emerald-600 text-white shadow-sm font-black'
+                      : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
                   }`}
                 >
                   {language === 'ar' ? 'آيفون وآيباد (Safari)' : 'iPhone / iPad (Safari)'}
                 </button>
               </div>
 
-              {/* Instructions content */}
-              <div className="space-y-3 text-xs text-gray-650 dark:text-gray-300 leading-relaxed font-semibold bg-gray-50 dark:bg-gray-850/70 p-4 rounded-2xl border border-gray-100 dark:border-gray-800">
+              {/* Instructions list with high-contrast cards */}
+              <div className="space-y-2 bg-gray-50 dark:bg-gray-800/80 p-3.5 rounded-2xl border border-gray-200 dark:border-gray-700">
                 {guideTab === 'android' ? (
                   language === 'ar' ? (
-                    <ol className="list-decimal list-inside space-y-2 text-right">
-                      <li>افتح الرابط في متصفح <strong className="text-emerald-600 dark:text-emerald-400">Google Chrome</strong>.</li>
-                      <li>اضغط على قائمة الخيارات <strong className="text-emerald-600 dark:text-emerald-400">(⋮ الثلاث نقاط)</strong> أعلى يسار المتصفح.</li>
-                      <li>اختر <strong className="text-emerald-600 dark:text-emerald-400">"تثبيت التطبيق"</strong> أو <strong className="text-emerald-600 dark:text-emerald-400">"إضافة إلى الشاشة الرئيسية"</strong>.</li>
-                      <li>سيظهر التطبيق كأيقونة مستقلة على شاشة هاتفك.</li>
-                    </ol>
+                    <div className="space-y-2 text-right">
+                      <div className="flex items-start gap-2.5 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-750">
+                        <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">1</span>
+                        <span className="text-xs sm:text-[13px] font-bold text-gray-900 dark:text-gray-100 leading-snug">
+                          افتح الرابط في متصفح <strong className="text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-1 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">Google Chrome</strong>.
+                        </span>
+                      </div>
+                      <div className="flex items-start gap-2.5 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-750">
+                        <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">2</span>
+                        <span className="text-xs sm:text-[13px] font-bold text-gray-900 dark:text-gray-100 leading-snug">
+                          اضغط على قائمة الخيارات <strong className="text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-1 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">(⋮ الثلاث نقاط)</strong> بأعلى المتصفح.
+                        </span>
+                      </div>
+                      <div className="flex items-start gap-2.5 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-750">
+                        <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">3</span>
+                        <span className="text-xs sm:text-[13px] font-bold text-gray-900 dark:text-gray-100 leading-snug">
+                          اختر <strong className="text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-1 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">"تثبيت التطبيق"</strong> أو <strong className="text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-1 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">"إضافة للشاشة الرئيسية"</strong>.
+                        </span>
+                      </div>
+                      <div className="flex items-start gap-2.5 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-750">
+                        <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">4</span>
+                        <span className="text-xs sm:text-[13px] font-bold text-gray-900 dark:text-gray-100 leading-snug">
+                          سيتم تثبيت التطبيق وتظهر أيقونته فوراً على شاشة هاتفك.
+                        </span>
+                      </div>
+                    </div>
                   ) : (
-                    <ol className="list-decimal list-inside space-y-2 text-left">
-                      <li>Ouvrez le lien dans <strong className="text-emerald-600 dark:text-emerald-400">Google Chrome</strong>.</li>
-                      <li>Appuyez sur le menu <strong className="text-emerald-600 dark:text-emerald-400">(⋮ trois points)</strong> en haut.</li>
-                      <li>Sélectionnez <strong className="text-emerald-600 dark:text-emerald-400">"Installer l'application"</strong> ou "Ajouter à l'écran d'accueil".</li>
-                      <li>L'icône sera ajoutée à votre écran d'accueil.</li>
-                    </ol>
+                    <div className="space-y-2 text-left">
+                      <div className="flex items-start gap-2.5 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-750">
+                        <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">1</span>
+                        <span className="text-xs sm:text-[13px] font-bold text-gray-900 dark:text-gray-100 leading-snug">
+                          Ouvrez le lien dans <strong className="text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-1 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">Google Chrome</strong>.
+                        </span>
+                      </div>
+                      <div className="flex items-start gap-2.5 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-750">
+                        <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">2</span>
+                        <span className="text-xs sm:text-[13px] font-bold text-gray-900 dark:text-gray-100 leading-snug">
+                          Appuyez sur le menu <strong className="text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-1 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">(⋮ trois points)</strong> en haut.
+                        </span>
+                      </div>
+                      <div className="flex items-start gap-2.5 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-750">
+                        <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">3</span>
+                        <span className="text-xs sm:text-[13px] font-bold text-gray-900 dark:text-gray-100 leading-snug">
+                          Sélectionnez <strong className="text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-1 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">"Installer l'application"</strong> ou "Ajouter à l'écran d'accueil".
+                        </span>
+                      </div>
+                      <div className="flex items-start gap-2.5 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-750">
+                        <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">4</span>
+                        <span className="text-xs sm:text-[13px] font-bold text-gray-900 dark:text-gray-100 leading-snug">
+                          L'icône de l'application sera ajoutée à votre écran d'accueil.
+                        </span>
+                      </div>
+                    </div>
                   )
                 ) : (
                   language === 'ar' ? (
-                    <ol className="list-decimal list-inside space-y-2 text-right">
-                      <li>تأكد من فتح الرابط داخل متصفح <strong className="text-emerald-600 dark:text-emerald-400">Safari</strong>.</li>
-                      <li>اضغط على زر <strong className="text-emerald-600 dark:text-emerald-400">مشاركة (Share)</strong> في شريط متصفح Safari بالأسفل.</li>
-                      <li>قم بالتمرير للأسفل واختر <strong className="text-emerald-600 dark:text-emerald-400">إضافة إلى الشاشة الرئيسية (Add to Home Screen)</strong>.</li>
-                      <li>اضغط على زر <strong className="text-emerald-600 dark:text-emerald-400">إضافة (Add)</strong> في الزاوية العلوية.</li>
-                    </ol>
+                    <div className="space-y-2 text-right">
+                      <div className="flex items-start gap-2.5 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-750">
+                        <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">1</span>
+                        <span className="text-xs sm:text-[13px] font-bold text-gray-900 dark:text-gray-100 leading-snug">
+                          تأكد من فتح الرابط داخل متصفح <strong className="text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-1 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">Safari</strong>.
+                        </span>
+                      </div>
+                      <div className="flex items-start gap-2.5 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-750">
+                        <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">2</span>
+                        <span className="text-xs sm:text-[13px] font-bold text-gray-900 dark:text-gray-100 leading-snug">
+                          اضغط على زر <strong className="text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-1 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">مشاركة (Share)</strong> في شريط متصفح Safari بالأسفل.
+                        </span>
+                      </div>
+                      <div className="flex items-start gap-2.5 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-750">
+                        <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">3</span>
+                        <span className="text-xs sm:text-[13px] font-bold text-gray-900 dark:text-gray-100 leading-snug">
+                          قم بالتمرير للأسفل واختر <strong className="text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-1 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">إضافة إلى الشاشة الرئيسية (Add to Home Screen)</strong>.
+                        </span>
+                      </div>
+                      <div className="flex items-start gap-2.5 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-750">
+                        <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">4</span>
+                        <span className="text-xs sm:text-[13px] font-bold text-gray-900 dark:text-gray-100 leading-snug">
+                          اضغط على زر <strong className="text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-1 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">إضافة (Add)</strong> في الزاوية العلوية لتأكيد التثبيت.
+                        </span>
+                      </div>
+                    </div>
                   ) : (
-                    <ol className="list-decimal list-inside space-y-2 text-left">
-                      <li>Assurez-vous d'utiliser le navigateur <strong className="text-emerald-600 dark:text-emerald-400">Safari</strong>.</li>
-                      <li>Appuyez sur l'icône <strong className="text-emerald-600 dark:text-emerald-400">Partager (Share)</strong> en bas de l'écran.</li>
-                      <li>Faites défiler vers le bas et appuyez sur <strong className="text-emerald-600 dark:text-emerald-400">Sur l'écran d'accueil</strong>.</li>
-                      <li>Touchez <strong className="text-emerald-600 dark:text-emerald-400">Ajouter</strong> en haut à droite.</li>
-                    </ol>
+                    <div className="space-y-2 text-left">
+                      <div className="flex items-start gap-2.5 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-750">
+                        <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">1</span>
+                        <span className="text-xs sm:text-[13px] font-bold text-gray-900 dark:text-gray-100 leading-snug">
+                          Assurez-vous d'utiliser le navigateur <strong className="text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-1 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">Safari</strong>.
+                        </span>
+                      </div>
+                      <div className="flex items-start gap-2.5 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-750">
+                        <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">2</span>
+                        <span className="text-xs sm:text-[13px] font-bold text-gray-900 dark:text-gray-100 leading-snug">
+                          Appuyez sur l'icône <strong className="text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-1 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">Partager (Share)</strong> en bas de Safari.
+                        </span>
+                      </div>
+                      <div className="flex items-start gap-2.5 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-750">
+                        <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">3</span>
+                        <span className="text-xs sm:text-[13px] font-bold text-gray-900 dark:text-gray-100 leading-snug">
+                          Faites défiler vers le bas et appuyez sur <strong className="text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-1 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">Sur l'écran d'accueil</strong>.
+                        </span>
+                      </div>
+                      <div className="flex items-start gap-2.5 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-750">
+                        <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-black text-xs flex items-center justify-center shrink-0 mt-0.5">4</span>
+                        <span className="text-xs sm:text-[13px] font-bold text-gray-900 dark:text-gray-100 leading-snug">
+                          Touchez <strong className="text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-1 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">Ajouter</strong> en haut à droite.
+                        </span>
+                      </div>
+                    </div>
                   )
                 )}
               </div>
 
+              {/* Close button */}
               <button
                 type="button"
                 onClick={() => setShowInstallGuide(false)}
-                className="mt-4 w-full py-2.5 rounded-xl bg-gray-150 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-750 text-gray-800 dark:text-gray-200 font-black text-xs transition cursor-pointer"
+                className="mt-4 w-full py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-900 dark:text-white font-black text-xs transition cursor-pointer border border-gray-200 dark:border-gray-700"
               >
                 {language === 'ar' ? 'حسناً، إغلاق' : "Fermer"}
               </button>
