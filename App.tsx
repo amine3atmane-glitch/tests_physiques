@@ -7,6 +7,7 @@ import { ClassesScreen } from './screens/ClassesScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { LanguageProvider, useLanguage } from './utils/i18n';
 import { getAllClasses } from './utils/db';
+import { OfflineIndicator } from './components/OfflineIndicator';
 
 const MainLayout: React.FC = () => {
   const [activeScreen, setActiveScreen] = useState<ActiveScreen>('classes');
@@ -92,6 +93,7 @@ const MainLayout: React.FC = () => {
             />
           )}
         </main>
+        <OfflineIndicator />
       </div>
     </div>
   );
