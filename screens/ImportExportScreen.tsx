@@ -269,7 +269,7 @@ export const ImportExportScreen: React.FC<ImportExportScreenProps> = ({
             "الاسم والنسب": tItem.nomEleve || '',
             "الجنس": tItem.sexe || '',
             "VMA (كم/س)": tItem.vma ?? '',
-            "30 م سرعة (ث)": tItem.vitesse30m ?? '',
+            "30 م سرعة (ث)": tItem.vitesse30m !== undefined ? Number(tItem.vitesse30m).toFixed(2) : '',
             "رمي الجلة (م)": tItem.lancerPoids ?? '',
             "القفز الأفقي (م)": tItem.sautHorizontal ?? '',
             "القفز العمودي (سم)": tItem.sautVertical ?? '',

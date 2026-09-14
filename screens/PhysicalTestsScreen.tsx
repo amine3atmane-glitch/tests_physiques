@@ -279,7 +279,7 @@ export const PhysicalTestsScreen: React.FC<PhysicalTestsScreenProps> = ({
                 "الاسم والنسب": student.nomEleve,
                 "الجنس": student.sexe || '',
                 "السرعة القصوى الهوائية (كم/س)": finalVma !== undefined ? finalVma : '',
-                "30 م سرعة (ث)": res?.vitesse30m !== undefined ? res.vitesse30m : '',
+                "30 م سرعة (ث)": res?.vitesse30m !== undefined ? Number(res.vitesse30m).toFixed(2) : '',
                 "القفز الأفقي (سم)": res?.sautHorizontal !== undefined ? res.sautHorizontal : '',
                 "القفز العمودي سارجنت (سم)": res?.sautVertical !== undefined ? res.sautVertical : '',
                 "رمي الكرة الطبية 3كلغ (متر)": res?.lancerMedball !== undefined ? res.lancerMedball : '',
@@ -705,11 +705,11 @@ export const PhysicalTestsScreen: React.FC<PhysicalTestsScreenProps> = ({
                                                 <input
                                                     type="number"
                                                     step="0.01"
-                                                    placeholder=""
-                                                    defaultValue={res?.vitesse30m !== undefined ? res.vitesse30m : ''}
+                                                    placeholder="0.00"
+                                                    defaultValue={res?.vitesse30m !== undefined ? Number(res.vitesse30m).toFixed(2) : ''}
                                                     key={`vitesse-${student.numeroEleve}-${res?.vitesse30m}`}
                                                     onBlur={(e) => handleTableFieldChange(student, 'vitesse30m', e.target.value)}
-                                                    className="w-full text-center py-1.5 px-1 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                                                    className="w-full text-center py-1.5 px-1 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:ring-1 focus:ring-indigo-500 focus:outline-none font-mono font-bold"
                                                 />
                                             </td>
 
@@ -1243,7 +1243,7 @@ export const PhysicalTestsScreen: React.FC<PhysicalTestsScreenProps> = ({
                                             <td className="p-2 font-bold text-indigo-600 dark:text-indigo-400">
                                                 {item.vma ? `${item.vma} كم/س` : '-'}
                                             </td>
-                                            <td className="p-2">{item.vitesse30m ? `${item.vitesse30m} ث` : '-'}</td>
+                                            <td className="p-2 font-mono font-bold">{item.vitesse30m ? Number(item.vitesse30m).toFixed(2) : '-'}</td>
                                             <td className="p-2">{item.sautHorizontal ? `${item.sautHorizontal} سم` : '-'}</td>
                                         </tr>
                                     ))}

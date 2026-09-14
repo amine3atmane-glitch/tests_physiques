@@ -488,8 +488,8 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
                           <div className="mt-1 pt-1 border-t border-white/20 w-full text-center flex flex-col items-center">
                             {runner.isFinished ? (
                               <>
-                                <div className="text-base font-mono font-black text-white">
-                                  ⚡ {runner.recordedTime?.toFixed(2)} ث
+                                <div className="text-base font-mono font-black text-white tracking-wide">
+                                  {runner.recordedTime?.toFixed(2)}
                                 </div>
                                 {isExAequo && (
                                   <span className="mt-1 inline-flex items-center gap-0.5 text-[10px] font-extrabold px-2 py-0.5 bg-amber-400 text-gray-900 rounded-md shadow-xs">
@@ -510,7 +510,7 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
                         
                         {/* Tooltip on hover */}
                         <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 text-xs font-black bg-gray-900 text-white px-3 py-1 rounded-xl shadow-xl whitespace-nowrap z-50 border border-gray-700">
-                          {runner.isFinished ? `الزمن: ${runner.recordedTime}ث (اضغط للإلغاء)` : `تسجيل توقيت ${student.nomEleve}`}
+                          {runner.isFinished ? `الزمن: ${runner.recordedTime?.toFixed(2)} (اضغط للإلغاء)` : `تسجيل توقيت ${student.nomEleve}`}
                         </div>
                       </div>
                     );
@@ -659,8 +659,8 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
 
                       {/* Previous result tag */}
                       {hasPrev30m && (
-                        <div className="mt-2 text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-md self-start border border-emerald-200 dark:border-emerald-800">
-                          ⚡ {prevResult.vitesse30m?.toFixed(2)} ث
+                        <div className="mt-2 text-xs font-mono font-black text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-md self-start border border-emerald-200 dark:border-emerald-800">
+                          {prevResult.vitesse30m?.toFixed(2)}
                         </div>
                       )}
                     </button>
@@ -751,7 +751,7 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
                             <div>
                               <div className="text-[10px] font-bold text-emerald-100 uppercase">الزمن المسجل</div>
                               <div className="text-2xl font-mono font-black text-white">
-                                {runner.recordedTime?.toFixed(2)} ثانية
+                                {runner.recordedTime?.toFixed(2)}
                               </div>
                             </div>
                             <span className="text-xs font-bold text-emerald-100 underline hover:text-white">
@@ -816,7 +816,7 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
                             </span>
                           </td>
                           <td className="p-2 font-mono font-black text-amber-700 dark:text-amber-400 text-sm">
-                            {timeSec?.toFixed(2)} ث
+                            {timeSec?.toFixed(2)}
                           </td>
                           <td className="p-2 font-mono font-bold text-indigo-600 dark:text-indigo-400">
                             {speedKmH} كم/س

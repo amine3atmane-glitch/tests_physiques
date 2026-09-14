@@ -104,7 +104,7 @@ export const StudentDataModal: React.FC<StudentDataModalProps> = ({
           poids: p?.poids !== undefined ? String(p.poids) : '',
           frequenceCardiaque: p?.frequenceCardiaque !== undefined ? String(p.frequenceCardiaque) : '',
           vma: v?.vma !== undefined ? String(v.vma) : p?.vma !== undefined ? String(p.vma) : '',
-          vitesse30m: p?.vitesse30m !== undefined ? String(p.vitesse30m) : '',
+          vitesse30m: p?.vitesse30m !== undefined ? Number(p.vitesse30m).toFixed(2) : '',
           sautHorizontal: p?.sautHorizontal !== undefined ? String(p.sautHorizontal) : '',
           sautVertical: p?.sautVertical !== undefined ? String(p.sautVertical) : '',
           lancerMedball: p?.lancerMedball !== undefined ? String(p.lancerMedball) : '',
