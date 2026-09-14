@@ -56,17 +56,20 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
             <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
               <AcademicCapIcon className="w-5 h-5" />
             </div>
-            <div>
+            <div className="space-y-1">
               <h3 className="text-xs font-black text-indigo-900 dark:text-indigo-300 uppercase tracking-wider mb-1">
-                {isAr ? 'من طوّر التطبيق' : 'Développeur & Concepteur'}
+                {isAr ? 'من طوّر التطبيق' : 'Développeurs & Concepteurs'}
               </h3>
-              <p className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white mb-0.5">
-                {isAr ? 'الأستاذ: محمد عثماني (Amine Athmane)' : 'Professeur : Amine Athmane'}
+              <p className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white">
+                {isAr ? 'المفتش التربوي : أمين سنوسي' : 'Inspecteur EPS : Amine Sanoussi'}
               </p>
-              <p className="text-xs text-gray-650 dark:text-gray-400">
+              <p className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white">
+                {isAr ? 'الأستاذ : عمر حماني' : 'Professeur : Omar Hamani'}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 {isAr 
-                  ? 'أستاذ مادة التربية البدنية والرياضية (EPS) ومطور حلول رقمية بيداغوجية لفائدة أساتذة وأطر التربية والتعليم.' 
-                  : 'Professeur d\'Éducation Physique et Sportive (EPS) & Développeur de solutions pédagogiques numériques.'}
+                  ? 'أطر تربوية بمديرية تاوريرت ومطورو حلول رقمية بيداغوجية لفائدة أساتذة وأطر التربية والتعليم.' 
+                  : 'Cadres pédagogiques de la direction de Taourirt et concepteurs de solutions numériques pour l\'éducation.'}
               </p>
             </div>
           </div>
