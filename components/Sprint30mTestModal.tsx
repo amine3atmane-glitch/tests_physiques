@@ -54,6 +54,15 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
   const [elapsedTime, setElapsedTime] = useState<number>(0); // in milliseconds
   const startTimeRef = useRef<number>(0);
 
+  // Multi-touch synchronization and race-condition safety refs
+  const physicalResultsRef = useRef<PhysicalTests[]>([]);
+  const lastFinishTapRef = useRef<{ timestamp: number; timeSec: number } | null>(null);
+  const lastTouchHandledTimeRef = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    physicalResultsRef.current = physicalResults;
+  }, [physicalResults]);
+
   // Audio Context for beeps
   const audioCtxRef = useRef<AudioContext | null>(null);
 
@@ -220,19 +229,30 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
   const resetTimer = () => {
     setTestState('idle');
     setElapsedTime(0);
+    lastFinishTapRef.current = null;
     setSelectedRunners(prev => prev.map(r => ({ ...r, recordedTime: undefined, isFinished: false })));
   };
 
-  // Record finish time for a runner tile when clicked
-  const handleRunnerTileClick = async (studentNum: string) => {
+  // Record finish time for a runner tile when touched/clicked (supports Multi-touch Ex æquo)
+  const handleRunnerTileFinish = async (studentNum: string) => {
     if (testState !== 'running' && testState !== 'paused') return;
 
     const runner = selectedRunners.find(r => r.studentNumber === studentNum);
     if (!runner) return;
 
     if (!runner.isFinished) {
-      // Record time
-      const timeInSec = Number((elapsedTime / 1000).toFixed(2));
+      const now = Date.now();
+      let timeInSec = Number((elapsedTime / 1000).toFixed(2));
+
+      // Multi-touch Ex æquo synchronization:
+      // If another runner finished within 150ms (natural two-finger screen tap latency),
+      // synchronize their times to be 100% identical!
+      if (lastFinishTapRef.current && (now - lastFinishTapRef.current.timestamp) < 150) {
+        timeInSec = lastFinishTapRef.current.timeSec;
+      } else {
+        lastFinishTapRef.current = { timestamp: now, timeSec: timeInSec };
+      }
+
       playBeep(1318.5, 0.15, 'sine');
 
       setSelectedRunners(prev => prev.map(r => r.studentNumber === studentNum ? { ...r, recordedTime: timeInSec, isFinished: true } : r));
@@ -240,16 +260,32 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
     } else {
       // Undo recorded time
       playBeep(440, 0.1);
+      lastFinishTapRef.current = null;
       setSelectedRunners(prev => prev.map(r => r.studentNumber === studentNum ? { ...r, recordedTime: undefined, isFinished: false } : r));
     }
   };
 
-  // Save student 30m time to IndexedDB
+  // Direct multi-touch handler (fires on touchscreen instantly without delay)
+  const handleRunnerTouchStart = (e: React.TouchEvent, studentNum: string) => {
+    if (testState !== 'running' && testState !== 'paused') return;
+    e.preventDefault(); // Prevents browser zoom/scroll gesture and synthetic double-click
+    lastTouchHandledTimeRef.current[studentNum] = Date.now();
+    handleRunnerTileFinish(studentNum);
+  };
+
+  // Mouse click fallback for desktop
+  const handleRunnerClick = (studentNum: string) => {
+    if (Date.now() - (lastTouchHandledTimeRef.current[studentNum] || 0) < 450) return;
+    handleRunnerTileFinish(studentNum);
+  };
+
+  // Save student 30m time to IndexedDB (safe against concurrent multi-touch calls)
   const saveStudent30mTime = async (numeroEleve: string, timeSec: number) => {
     const studentObj = students.find(s => s.numeroEleve === numeroEleve);
     if (!studentObj) return;
 
-    const currentPhys = [...physicalResults];
+    // Use synchronous ref to prevent race condition when 2 runners are touched at the same time
+    const currentPhys = [...physicalResultsRef.current];
     const existingIdx = currentPhys.findIndex(p => p.numeroEleve === numeroEleve);
 
     const updatedItem: PhysicalTests = {
@@ -267,6 +303,8 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
       currentPhys.push(updatedItem);
     }
 
+    // Keep ref and state in sync immediately
+    physicalResultsRef.current = currentPhys;
     setPhysicalResults(currentPhys);
     await savePhysicalTests(selectedClass, currentPhys);
     window.dispatchEvent(new CustomEvent('dbUpdated'));
@@ -405,21 +443,30 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
             {/* Selected Runners inside Live Timer Window */}
             {activeSelectedRunners.length > 0 && (
               <div className="w-full max-w-3xl my-3 p-3 sm:p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10">
-                <div className="text-xs font-bold text-amber-300 text-center mb-2.5 flex items-center justify-center gap-1.5">
-                  <UserGroupIcon className="w-4 h-4 text-amber-400" />
-                  <span>المتسابقون المحددون (اضغط على بطاقة التلميذ لتسجيل توقيته مباشرة ⏱️):</span>
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-1.5 mb-2.5 px-1 text-xs">
+                  <div className="font-bold text-amber-300 flex items-center gap-1.5">
+                    <UserGroupIcon className="w-4 h-4 text-amber-400" />
+                    <span>المتسابقون المحددون (انقر لتسجيل التوقيت ⏱️):</span>
+                  </div>
+                  <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-500/25 text-emerald-200 text-[11px] font-bold border border-emerald-400/40">
+                    <span>👆👆 ميزة اللمس المتعدد مفعلة (المس بأصبعين معاً للوصول المتزامن)</span>
+                  </div>
                 </div>
                 <div className={`grid grid-cols-2 ${activeSelectedRunners.length >= 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} ${activeSelectedRunners.length === 4 ? 'md:grid-cols-4' : ''} gap-3`}>
                   {selectedRunners.map((runner) => {
                     const student = students.find(s => s.numeroEleve === runner.studentNumber);
                     if (!student) return null;
 
+                    const isExAequo = runner.isFinished && runner.recordedTime !== undefined &&
+                      selectedRunners.some(r => r.studentNumber !== runner.studentNumber && r.isFinished && r.recordedTime === runner.recordedTime);
+
                     return (
                       <div key={runner.laneIndex} className="relative group">
                         <button
-                          onClick={() => handleRunnerTileClick(student.numeroEleve)}
+                          onTouchStart={(e) => handleRunnerTouchStart(e, student.numeroEleve)}
+                          onClick={() => handleRunnerClick(student.numeroEleve)}
                           disabled={testState === 'idle'}
-                          className={`w-full flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all transform active:scale-95 cursor-pointer shadow-md text-center ${
+                          className={`w-full flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all transform active:scale-95 cursor-pointer shadow-md text-center touch-manipulation select-none ${
                             runner.isFinished
                               ? 'bg-emerald-600 border-emerald-400 text-white shadow-emerald-500/30 ring-2 ring-emerald-400'
                               : testState === 'running'
@@ -438,14 +485,21 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
                             {student.nomEleve}
                           </div>
 
-                          <div className="mt-1 pt-1 border-t border-white/20 w-full text-center">
+                          <div className="mt-1 pt-1 border-t border-white/20 w-full text-center flex flex-col items-center">
                             {runner.isFinished ? (
-                              <div className="text-base font-mono font-black text-white">
-                                ⚡ {runner.recordedTime?.toFixed(2)} ث
-                              </div>
+                              <>
+                                <div className="text-base font-mono font-black text-white">
+                                  ⚡ {runner.recordedTime?.toFixed(2)} ث
+                                </div>
+                                {isExAequo && (
+                                  <span className="mt-1 inline-flex items-center gap-0.5 text-[10px] font-extrabold px-2 py-0.5 bg-amber-400 text-gray-900 rounded-md shadow-xs">
+                                    🤝 متزامن (Ex æquo)
+                                  </span>
+                                )}
+                              </>
                             ) : testState === 'running' ? (
                               <div className="text-xs font-bold text-amber-300 flex items-center justify-center gap-1">
-                                <span>انقر للتسجيل</span>
+                                <span>المس للتسجيل</span>
                                 <CheckCircleIcon className="w-4 h-4" />
                               </div>
                             ) : (
@@ -617,14 +671,19 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
           ) : (
             /* ACTIVE RACE GRID: ONLY SHOW THE SELECTED 2, 3, OR 4 STUDENTS */
             <div className="space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
                 <h3 className="text-sm font-extrabold text-amber-600 dark:text-amber-400 flex items-center gap-2">
                   <UserGroupIcon className="w-5 h-5" />
-                  <span>اضغط على بطاقة التلميذ فور توصله بخط النهاية لتسجيل زمنه:</span>
+                  <span>المس بطاقة التلميذ فور وصوله لخط النهاية لتسجيل زمنه:</span>
                 </h3>
-                <span className="text-xs font-bold text-gray-500 dark:text-gray-400">
-                  {testState === 'running' ? '⚡ العداد شغال...' : '⏸️ موقوف مؤقتاً'}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 rounded-xl border border-emerald-300 dark:border-emerald-800">
+                    👆👆 اللمس المتعدد مفعل (أصبعان معاً)
+                  </span>
+                  <span className="text-xs font-bold text-gray-500 dark:text-gray-400">
+                    {testState === 'running' ? '⚡ العداد شغال...' : '⏸️ موقوف مؤقتاً'}
+                  </span>
+                </div>
               </div>
 
               {/* Active Runners Cards Grid (Matches VMA Style) */}
@@ -640,11 +699,15 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
                     );
                   }
 
+                  const isExAequo = runner.isFinished && runner.recordedTime !== undefined &&
+                    selectedRunners.some(r => r.studentNumber !== runner.studentNumber && r.isFinished && r.recordedTime === runner.recordedTime);
+
                   return (
                     <button
                       key={student.numeroEleve}
-                      onClick={() => handleRunnerTileClick(student.numeroEleve)}
-                      className={`relative flex flex-col justify-between p-5 rounded-3xl border-2 text-right transition-all transform active:scale-95 cursor-pointer shadow-lg select-none min-h-[170px] ${
+                      onTouchStart={(e) => handleRunnerTouchStart(e, student.numeroEleve)}
+                      onClick={() => handleRunnerClick(student.numeroEleve)}
+                      className={`relative flex flex-col justify-between p-5 rounded-3xl border-2 text-right transition-all transform active:scale-95 cursor-pointer shadow-lg select-none min-h-[170px] touch-manipulation ${
                         runner.isFinished
                           ? 'bg-gradient-to-b from-emerald-500 to-emerald-700 text-white border-emerald-400 shadow-emerald-600/30'
                           : 'bg-white dark:bg-gray-800 border-amber-500 dark:border-amber-500 hover:border-amber-400 shadow-amber-500/10'
@@ -658,13 +721,20 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
                           الممر #{runner.laneIndex}
                         </span>
 
-                        <span className={`px-2 py-0.5 rounded-lg text-xs font-black ${
-                          runner.isFinished
-                            ? 'bg-white text-emerald-800'
-                            : student.sexe === 'F' ? 'bg-pink-100 text-pink-700' : 'bg-blue-100 text-blue-700'
-                        }`}>
-                          {student.sexe === 'F' ? 'أنثى' : 'ذكر'}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {isExAequo && (
+                            <span className="px-2 py-0.5 rounded-lg text-[11px] font-extrabold bg-amber-400 text-gray-900 shadow-xs">
+                              🤝 وصول متزامن Ex æquo
+                            </span>
+                          )}
+                          <span className={`px-2 py-0.5 rounded-lg text-xs font-black ${
+                            runner.isFinished
+                              ? 'bg-white text-emerald-800'
+                              : student.sexe === 'F' ? 'bg-pink-100 text-pink-700' : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            {student.sexe === 'F' ? 'أنثى' : 'ذكر'}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Main Student Name & Info */}
@@ -690,7 +760,7 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
                           </div>
                         ) : (
                           <div className="flex items-center justify-between w-full text-amber-600 dark:text-amber-400">
-                            <span className="text-xs font-black">اضغط للتسجيل عند الوصول 🏁</span>
+                            <span className="text-xs font-black">المس للتسجيل عند الوصول 🏁</span>
                             <CheckCircleIcon className="w-6 h-6 animate-pulse" />
                           </div>
                         )}
