@@ -355,7 +355,7 @@ export const saveCompleteStudentData = async (
     if (vmaVal !== undefined && vmaVal > 0) {
         const vmaList = await getVmaResults(className);
         const vmaIdx = vmaList.findIndex(v => v.numeroEleve === oldNumeroEleve);
-        const existingPalier = (vmaIdx >= 0 && vmaList[vmaIdx].palierAtteint) ? vmaList[vmaIdx].palierAtteint : Math.max(1, Math.round((vmaVal - 8) / 0.5) + 1);
+        const existingPalier = (vmaIdx >= 0 && vmaList[vmaIdx].palierAtteint) ? vmaList[vmaIdx].palierAtteint : Math.max(1, Math.round((vmaVal - 8.5) / 0.5) + 1);
         const updatedVma: StudentResult = {
             ...(vmaIdx >= 0 ? vmaList[vmaIdx] : { palierAtteint: existingPalier }),
             numeroEleve: studentIdentity.numeroEleve,
