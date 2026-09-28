@@ -16,6 +16,7 @@ interface ResultsTableProps {
   onClearAll?: () => void;
   onGenerateGroups?: () => void;
   selectedClass?: string;
+  onToggleGender?: (numeroEleve: string) => void;
 }
 
 export const ResultsTable: React.FC<ResultsTableProps> = ({ 
@@ -24,12 +25,32 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({
   onDeleteResult,
   onClearAll,
   onGenerateGroups,
-  selectedClass
+  selectedClass,
+  onToggleGender
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [genderFilter, setGenderFilter] = useState<'ALL' | 'M' | 'F'>('ALL');
   const [sortBy, setSortBy] = useState<'number' | 'vma-desc' | 'vma-asc' | 'gender-m' | 'gender-f'>('number');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  const lastGenderTapRef = React.useRef<{ [key: string]: number }>({});
+
+  const handleGenderTap = (numeroEleve: string, isTouch = false) => {
+    if (!onToggleGender) return;
+    const now = Date.now();
+    const lastTap = lastGenderTapRef.current[numeroEleve] || 0;
+    if (isTouch) {
+      if (now - lastTap < 380) {
+        lastGenderTapRef.current[numeroEleve] = 0;
+        onToggleGender(numeroEleve);
+      } else {
+        lastGenderTapRef.current[numeroEleve] = now;
+      }
+    } else {
+      if (now - lastTap < 400) return;
+      lastGenderTapRef.current[numeroEleve] = now;
+      onToggleGender(numeroEleve);
+    }
+  };
 
   // Filter and sort results
   const filteredAndSortedResults = useMemo(() => {
@@ -290,12 +311,24 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({
                       {result.nomEleve || `تلميذ رقم ${result.numeroEleve}`}
                     </span>
                     {result.sexe && (
-                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-black shrink-0 ${
-                        result.sexe === 'F' 
-                          ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/50 dark:text-pink-300' 
-                          : 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
-                      }`}>
-                        {result.sexe === 'F' ? 'أنثى' : 'ذكر'}
+                      <span 
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black shrink-0 cursor-pointer select-none transition-all duration-150 hover:scale-110 active:scale-95 shadow-2xs border ${
+                          result.sexe === 'F' 
+                            ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/50 dark:text-pink-300 border-pink-200 dark:border-pink-800' 
+                            : 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+                        }`}
+                        title="انقر مرتين لتغيير الجنس بين ذكر وأنثى"
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          handleGenderTap(result.numeroEleve, false);
+                        }}
+                        onTouchEnd={(e) => {
+                          e.stopPropagation();
+                          handleGenderTap(result.numeroEleve, true);
+                        }}
+                      >
+                        <span>{result.sexe === 'F' ? 'أنثى' : 'ذكر'}</span>
+                        <span className="text-[9px] opacity-40">⇄</span>
                       </span>
                     )}
                   </div>
@@ -384,10 +417,22 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({
                     </td>
                     <td className="px-2 py-3 text-center">
                       {result.sexe ? (
-                        <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
-                          result.sexe === 'F' ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-300' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
-                        }`}>
-                          {result.sexe === 'F' ? 'أنثى' : 'ذكر'}
+                        <span 
+                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer select-none transition-all duration-150 hover:scale-110 active:scale-95 border ${
+                            result.sexe === 'F' ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-300 border-pink-200 dark:border-pink-800' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+                          }`}
+                          title="انقر مرتين لتغيير الجنس بين ذكر وأنثى"
+                          onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            handleGenderTap(result.numeroEleve, false);
+                          }}
+                          onTouchEnd={(e) => {
+                            e.stopPropagation();
+                            handleGenderTap(result.numeroEleve, true);
+                          }}
+                        >
+                          <span>{result.sexe === 'F' ? 'أنثى' : 'ذكر'}</span>
+                          <span className="text-[9px] opacity-40">⇄</span>
                         </span>
                       ) : '-'}
                     </td>

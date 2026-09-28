@@ -42,6 +42,19 @@ export const useLucLeger = (
             setFinishedStudents(finished);
         });
     }
+
+    const handleDbUpdate = () => {
+        if (className) {
+            getVmaResults(className).then(loadedResults => {
+                setResults(loadedResults);
+                const finished = new Set(loadedResults.map(r => String(r.numeroEleve)));
+                setFinishedStudents(finished);
+            });
+        }
+    };
+
+    window.addEventListener('dbUpdated', handleDbUpdate);
+    return () => window.removeEventListener('dbUpdated', handleDbUpdate);
   }, [className]);
   
   const stopTimer = useCallback(() => {
@@ -328,6 +341,7 @@ export const useLucLeger = (
     currentLevel,
     finishedStudents,
     results,
+    setResults,
     startTest,
     stopTest,
     clearAllData,

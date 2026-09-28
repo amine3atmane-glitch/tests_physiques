@@ -168,7 +168,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {t.class} :
               </span>
               <span className="text-xs font-bold px-2.5 py-0.5 rounded-md bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
-                {selectedClass || "EPS"}
+                {selectedClass || (language === 'ar' ? 'لا يوجد قسم' : 'Aucune classe')}
               </span>
             </div>
           </div>

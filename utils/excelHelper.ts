@@ -474,6 +474,310 @@ export const parseStudentExcel = (data: ArrayBuffer): { students: StudentIdentit
 };
 
 /**
+ * Parses a TaRL support group Excel file (مجموعات الدعم بتلاميذ المؤسسة / طارل).
+ * Correctly extracts Massar codes, student names, genders, and groups by TaRL support groups or classes.
+ */
+export const parseTarlStudentExcel = (data: ArrayBuffer): { className: string, students: StudentIdentity[] }[] => {
+  const XLSX = (window as any).XLSX;
+  if (!XLSX) {
+    throw new Error("La bibliothèque XLSX n'est pas chargée.");
+  }
+
+  const workbook = XLSX.read(data, { type: 'array' });
+  const resultsMap = new Map<string, StudentIdentity[]>();
+
+  workbook.SheetNames.forEach((sheetName: string) => {
+    const worksheet = workbook.Sheets[sheetName];
+    const json = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' }) as any[][];
+
+    if (!json || json.length === 0) return;
+
+    let defaultGroupName = sheetName.trim();
+    if (defaultGroupName.toLowerCase().includes('sheet') || defaultGroupName.toLowerCase().includes('feuil')) {
+      defaultGroupName = 'قسم طارل';
+    } else if (!defaultGroupName.includes('طارل') && !defaultGroupName.toLowerCase().includes('tarl')) {
+      defaultGroupName = `طارل - ${defaultGroupName}`;
+    }
+
+    // Look for TaRL header row
+    let bestHeaderRowIndex = -1;
+    let maxHeaderScore = 0;
+    let colMap = {
+      idCol: -1,
+      massarCol: -1,
+      nameCol: -1,
+      sexCol: -1,
+      classCol: -1,
+      groupCol: -1, // TaRL group / مجموعة الدعم / الفوج
+      levelCol: -1
+    };
+
+    for (let r = 0; r < Math.min(json.length, 35); r++) {
+      const row = json[r];
+      if (!row || row.length === 0) continue;
+
+      let score = 0;
+      let idIdx = -1;
+      let massarIdx = -1;
+      let nameIdx = -1;
+      let sexIdx = -1;
+      let classIdx = -1;
+      let groupIdx = -1;
+      let levelIdx = -1;
+
+      for (let c = 0; c < row.length; c++) {
+        const cellRaw = String(row[c] || '').trim();
+        const cellNorm = normalizeArabic(cellRaw);
+        if (!cellNorm) continue;
+
+        // TaRL Group / Support Group / الفوج / مجموعة الدعم
+        if (
+          cellNorm.includes('مجموعه الدعم') ||
+          cellNorm.includes('مجموعات الدعم') ||
+          cellNorm.includes('مجموعه طارل') ||
+          cellNorm.includes('مجموعات طارل') ||
+          cellNorm.includes('طارل') ||
+          cellNorm.includes('الفوج') ||
+          cellNorm.includes('المجموعه') ||
+          cellNorm.includes('groupe soutien') ||
+          cellNorm.includes('groupe tarl') ||
+          cellNorm.includes('tarl')
+        ) {
+          groupIdx = c;
+          score += 6;
+        }
+
+        // Massar Code / ID
+        if (
+          cellNorm.includes('رقم التلميذ') || 
+          cellNorm.includes('رقم مسار') || 
+          cellNorm.includes('رمز مسار') || 
+          cellNorm.includes('كود مسار') || 
+          cellNorm.includes('code massar') || 
+          cellNorm.includes('cne') ||
+          cellNorm.includes('matricule')
+        ) {
+          massarIdx = c;
+          score += 5;
+        } else if (
+          cellNorm.includes('الترتيبي') || 
+          cellNorm === 'n°' || 
+          cellNorm === 'no' || 
+          cellNorm === 'num' || 
+          cellNorm === 'numero' || 
+          cellNorm === 'id' ||
+          cellNorm === 'رقم'
+        ) {
+          idIdx = c;
+          score += 3;
+        }
+
+        // Name
+        if (
+          cellNorm.includes('اسم التلميذ') || 
+          cellNorm.includes('الاسم والنسب') || 
+          cellNorm.includes('اسم و نسب') || 
+          cellNorm.includes('الاسم الكامل') || 
+          cellNorm.includes('الاسم العائلي') ||
+          cellNorm.includes('الاسم الشخصي') ||
+          cellNorm.includes('اسم الطالب') ||
+          cellNorm.includes('nom') || 
+          cellNorm.includes('prenom') || 
+          cellNorm.includes('eleve')
+        ) {
+          if (!cellNorm.includes('مؤسسة') && !cellNorm.includes('استاذ') && !cellNorm.includes('مدير') && !cellNorm.includes('مادة')) {
+            nameIdx = c;
+            score += 5;
+          }
+        } else if ((cellNorm.includes('اسم') || cellNorm.includes('نسب')) && !cellNorm.includes('مؤسسة') && !cellNorm.includes('استاذ') && !cellNorm.includes('مادة') && !cellNorm.includes('قسم')) {
+          nameIdx = c;
+          score += 3;
+        }
+
+        // Gender
+        if (
+          cellNorm.includes('النوع') || 
+          cellNorm.includes('الجنس') || 
+          cellNorm.includes('sexe') || 
+          cellNorm.includes('genre')
+        ) {
+          sexIdx = c;
+          score += 4;
+        }
+
+        // Level / المستوى
+        if (cellNorm.includes('المستوى') || cellNorm.includes('niveau')) {
+          levelIdx = c;
+          score += 2;
+        }
+
+        // Original Class / القسم الأصلي
+        if (cellNorm.includes('القسم') || cellNorm.includes('classe') || cellNorm.includes('القسم الاصلي')) {
+          classIdx = c;
+          score += 2;
+        }
+      }
+
+      if ((idIdx !== -1 || massarIdx !== -1) && nameIdx !== -1 && score > maxHeaderScore) {
+        maxHeaderScore = score;
+        bestHeaderRowIndex = r;
+        colMap = {
+          idCol: idIdx !== -1 ? idIdx : massarIdx,
+          massarCol: massarIdx !== -1 ? massarIdx : idIdx,
+          nameCol: nameIdx,
+          sexCol: sexIdx,
+          classCol: classIdx,
+          groupCol: groupIdx,
+          levelCol: levelIdx
+        };
+      }
+    }
+
+    let startRow = bestHeaderRowIndex !== -1 ? bestHeaderRowIndex + 1 : 1;
+    let autoCounter = 1;
+
+    for (let i = startRow; i < json.length; i++) {
+      const row = json[i];
+      if (!row || row.length === 0) continue;
+
+      let id = colMap.idCol !== -1 && row[colMap.idCol] !== undefined ? String(row[colMap.idCol]).trim() : '';
+      let massarCode = colMap.massarCol !== -1 && row[colMap.massarCol] !== undefined ? String(row[colMap.massarCol]).trim() : '';
+      let name = colMap.nameCol !== -1 && row[colMap.nameCol] !== undefined ? String(row[colMap.nameCol]).trim() : '';
+      let sexRaw = colMap.sexCol !== -1 && row[colMap.sexCol] !== undefined ? String(row[colMap.sexCol]).trim() : '';
+      let groupRaw = colMap.groupCol !== -1 && row[colMap.groupCol] !== undefined ? String(row[colMap.groupCol]).trim() : '';
+      let classRaw = colMap.classCol !== -1 && row[colMap.classCol] !== undefined ? String(row[colMap.classCol]).trim() : '';
+      let levelRaw = colMap.levelCol !== -1 && row[colMap.levelCol] !== undefined ? String(row[colMap.levelCol]).trim() : '';
+
+      // Fallback search for name
+      if (!name) {
+        for (let c = 0; c < row.length; c++) {
+          if (c !== colMap.idCol && c !== colMap.massarCol && c !== colMap.sexCol) {
+            const cellVal = String(row[c] || '').trim();
+            if (cellVal && cellVal.length >= 3 && isNaN(Number(cellVal)) && !isForbiddenStudentName(cellVal)) {
+              name = cellVal;
+              break;
+            }
+          }
+        }
+      }
+
+      if (isForbiddenStudentName(name)) continue;
+
+      // Ensure valid ID / Massar Code
+      let finalId = massarCode || id;
+      if (!finalId || isForbiddenStudentName(finalId) || finalId.includes('رقم') || finalId === 'undefined' || finalId === 'null') {
+        let foundCode = '';
+        for (let c = 0; c < row.length; c++) {
+          const val = String(row[c] || '').trim();
+          if (/^[A-Za-z][0-9]{8,9}$/.test(val)) {
+            foundCode = val;
+            break;
+          }
+        }
+        finalId = foundCode || String(autoCounter);
+      }
+
+      autoCounter++;
+
+      // Determine Gender
+      let sexe: 'M' | 'F' | undefined = undefined;
+      if (sexRaw) {
+        const s = sexRaw.toUpperCase();
+        if (['M', 'H', 'GARCON', 'MASCULIN', 'G', 'ذكر', '1'].some(k => s.startsWith(k))) {
+          sexe = 'M';
+        } else if (['F', 'FILLE', 'FEMININ', 'FEMME', 'أنثى', 'انثى', '2'].some(k => s.startsWith(k))) {
+          sexe = 'F';
+        }
+      }
+      if (!sexe && name) {
+        sexe = detectGenderFromName(name);
+      }
+
+      // Determine Target Class / TaRL Group Name
+      let targetGroup = defaultGroupName;
+      if (groupRaw && groupRaw.length > 0 && !isForbiddenStudentName(groupRaw)) {
+        if (groupRaw.includes('طارل') || groupRaw.toLowerCase().includes('tarl') || groupRaw.includes('فوج') || groupRaw.includes('مجموعة')) {
+          targetGroup = groupRaw;
+        } else {
+          targetGroup = `طارل - ${groupRaw}`;
+        }
+      } else if (classRaw && classRaw.length > 0 && !isForbiddenStudentName(classRaw) && !classRaw.includes('القسم')) {
+        targetGroup = `طارل - قسم ${classRaw}`;
+      } else if (levelRaw && levelRaw.length > 0 && !isForbiddenStudentName(levelRaw)) {
+        targetGroup = `طارل - ${levelRaw}`;
+      }
+
+      const studentObj: StudentIdentity = {
+        numeroEleve: finalId,
+        nomEleve: name,
+        sexe
+      };
+
+      if (!resultsMap.has(targetGroup)) {
+        resultsMap.set(targetGroup, []);
+      }
+      resultsMap.get(targetGroup)!.push(studentObj);
+    }
+  });
+
+  const results: { className: string, students: StudentIdentity[] }[] = [];
+  resultsMap.forEach((students, className) => {
+    if (students.length > 0) {
+      results.push({ className, students });
+    }
+  });
+
+  return results;
+};
+
+/**
+ * Universal student Excel parser supporting both standard Massar and TaRL formats.
+ */
+export const parseAnyStudentExcel = (
+  data: ArrayBuffer, 
+  listType: 'massar' | 'tarl' | 'auto' = 'auto'
+): { className: string, students: StudentIdentity[] }[] => {
+  if (listType === 'tarl') {
+    return parseTarlStudentExcel(data);
+  } else if (listType === 'massar') {
+    return parseStudentExcel(data);
+  }
+
+  // Auto detect: check if sheet contains TaRL keywords
+  const XLSX = (window as any).XLSX;
+  if (!XLSX) return parseStudentExcel(data);
+
+  try {
+    const workbook = XLSX.read(data, { type: 'array' });
+    let isTarl = false;
+
+    for (const sName of workbook.SheetNames) {
+      const ws = workbook.Sheets[sName];
+      const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as any[][];
+      const sampleText = json.slice(0, 15).map(r => r.join(' ')).join(' ').toLowerCase();
+      const normText = normalizeArabic(sampleText);
+
+      if (
+        normText.includes('طارل') || 
+        normText.includes('tarl') || 
+        normText.includes('مجموعات الدعم') || 
+        normText.includes('مجموعه الدعم') ||
+        normText.includes('مجموعه طارل') ||
+        normText.includes('رياده') ||
+        normText.includes('مؤسسات الرياده')
+      ) {
+        isTarl = true;
+        break;
+      }
+    }
+
+    return isTarl ? parseTarlStudentExcel(data) : parseStudentExcel(data);
+  } catch (e) {
+    return parseStudentExcel(data);
+  }
+};
+
+/**
  * Parses a numeric value safely from Excel cell (handling strings with commas, numbers, etc.)
  */
 const parseNumericCell = (val: any): number | undefined => {
@@ -852,6 +1156,40 @@ export const downloadStudentsTemplate = (className?: string) => {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "لائحة التلاميذ");
   const fileName = `نموذج_لائحة_التلاميذ_${className ? className.replace(/\s+/g, '_') : 'EPS'}.xlsx`;
+  XLSX.writeFile(wb, fileName);
+};
+
+/**
+ * Generates and downloads an Excel template for TaRL support groups (لائحة قسم طارل / مجموعات الدعم).
+ */
+export const downloadTarlStudentsTemplate = (groupName?: string) => {
+  const XLSX = (window as any).XLSX;
+  if (!XLSX) {
+    throw new Error("لم يتم تحميل مكتبة Excel.");
+  }
+
+  const rows: any[][] = [
+    ["الرقم الترتيبي", "رمز مسار", "الاسم والنسب", "الجنس (M/F)", "المستوى", "القسم الأصلي", "مجموعة طارل / الفوج"],
+    ["1", "M130024512", "أحمد المنصوري", "M", "الثالثة إعدادي", "3/1", groupName || "طارل - الفوج 1"],
+    ["2", "M130089623", "فاطمة الزهراء البقالي", "F", "الثالثة إعدادي", "3/2", groupName || "طارل - الفوج 1"],
+    ["3", "M130055178", "ياسين التازي", "M", "الثالثة إعدادي", "3/1", groupName || "طارل - الفوج 2"],
+    ["4", "M130099431", "سناء العمراني", "F", "الثالثة إعدادي", "3/3", groupName || "طارل - الفوج 2"]
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [
+    { wch: 12 },
+    { wch: 16 },
+    { wch: 30 },
+    { wch: 14 },
+    { wch: 18 },
+    { wch: 14 },
+    { wch: 24 }
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "مجموعات الدعم طارل");
+  const fileName = `نموذج_لائحة_قسم_طارل_${groupName ? groupName.replace(/\s+/g, '_') : 'TaRL'}.xlsx`;
   XLSX.writeFile(wb, fileName);
 };
 

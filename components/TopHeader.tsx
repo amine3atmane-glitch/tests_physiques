@@ -28,6 +28,13 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
     const fetchClasses = async () => {
       const classes = await getAllClasses();
       setClassList(classes);
+      if (classes.length > 0) {
+        if (!selectedClass || !classes.some(c => c.className === selectedClass)) {
+          setSelectedClass(classes[0].className);
+        }
+      } else if (selectedClass) {
+        setSelectedClass('');
+      }
     };
     fetchClasses();
     window.addEventListener('dbUpdated', fetchClasses);
@@ -86,22 +93,20 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                       {c.className} ({c.studentCount})
                     </option>
                   ))}
-                  {!classList.some(c => c.className === selectedClass) && (
-                    <option value={selectedClass} className="bg-white dark:bg-gray-800">{selectedClass}</option>
-                  )}
                 </select>
                 <div className="absolute end-1 pointer-events-none text-gray-400">
                   <ChevronDownIcon className="w-3.5 h-3.5" />
                 </div>
               </div>
             ) : (
-              <input
-                type="text"
-                value={selectedClass}
-                onChange={(e) => setSelectedClass(e.target.value)}
-                className="w-20 sm:w-28 text-[11px] sm:text-xs font-bold text-gray-800 dark:text-gray-100 bg-transparent focus:outline-none"
-                placeholder={t.classNamePlaceholder}
-              />
+              <button
+                type="button"
+                onClick={() => setActiveScreen('classes')}
+                className="text-[11px] sm:text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
+                title="الانتقال لإدارة الأقسام واستيراد لوائح Excel"
+              >
+                <span>{language === 'ar' ? 'لا توجد أقسام (استيراد Excel)' : 'Aucune classe (importer)'}</span>
+              </button>
             )}
           </div>
           

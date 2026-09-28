@@ -12,6 +12,29 @@ const PHYSICAL_TESTS_STORE = 'physicalTestsResults';
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
+// Clean up any legacy empty "Classe 1" placeholder automatically
+export const purgeEmptyPlaceholderClasses = async (db: IDBDatabase): Promise<void> => {
+  try {
+    const tx = db.transaction([STUDENTS_STORE, PHYSICAL_TESTS_STORE, VMA_STORE, ENDURANCE_STORE], 'readwrite');
+    const stStore = tx.objectStore(STUDENTS_STORE);
+    const req = stStore.getAll();
+    req.onsuccess = () => {
+      const items = req.result as { className: string; students: StudentIdentity[] }[];
+      items.forEach(item => {
+        const lower = (item.className || '').trim().toLowerCase();
+        if (lower === 'classe 1' || lower === 'classe1') {
+          const valid = (item.students || []).filter(s => s && s.nomEleve && !isForbiddenStudentName(s.nomEleve));
+          if (valid.length === 0) {
+            stStore.delete(item.className);
+          }
+        }
+      });
+    };
+  } catch (e) {
+    // Fail silently if not available
+  }
+};
+
 // Function to initialize the database
 const initDB = (): Promise<IDBDatabase> => {
   if (dbPromise) {
@@ -27,7 +50,9 @@ const initDB = (): Promise<IDBDatabase> => {
     };
 
     request.onsuccess = () => {
-      resolve(request.result);
+      const dbInstance = request.result;
+      purgeEmptyPlaceholderClasses(dbInstance).catch(() => {});
+      resolve(dbInstance);
     };
 
     request.onupgradeneeded = (event) => {
@@ -201,6 +226,11 @@ export const getAllClasses = async (): Promise<ClassStats[]> => {
             // Base classes from students list
             allStudents.forEach(item => {
                 const validStudents = (item.students || []).filter(s => s && s.nomEleve && !isForbiddenStudentName(s.nomEleve));
+                const lowerName = (item.className || '').trim().toLowerCase();
+                // Filter out empty placeholder "Classe 1" or empty classes without students
+                if ((lowerName === 'classe 1' || lowerName === 'classe1') && validStudents.length === 0) {
+                    return;
+                }
                 const boys = validStudents.filter(s => s.sexe === 'M').length;
                 const girls = validStudents.filter(s => s.sexe === 'F').length;
                 classMap.set(item.className, {
@@ -374,4 +404,157 @@ export const saveCompleteStudentData = async (
 
     // 4. Dispatch update event
     window.dispatchEvent(new CustomEvent('dbUpdated'));
+};
+
+/**
+ * Toggles a student's gender between 'M' (ذكر) and 'F' (أنثى)
+ * and keeps studentLists, physicalTests, and vmaResults synchronized.
+ */
+export const toggleStudentGender = async (
+    className: string,
+    numeroEleve: string
+): Promise<'M' | 'F'> => {
+    if (!className || !numeroEleve) {
+        throw new Error('Class name and student number are required');
+    }
+
+    let newSexe: 'M' | 'F' = 'M';
+
+    // 1. Update in studentLists
+    try {
+        const students = await getStudentList(className);
+        const idx = students.findIndex(s => s.numeroEleve === numeroEleve);
+        if (idx >= 0) {
+            const currentSexe = students[idx].sexe;
+            newSexe = currentSexe === 'F' ? 'M' : 'F';
+            students[idx] = { ...students[idx], sexe: newSexe };
+            await saveStudentList(className, students);
+        } else {
+            newSexe = 'F';
+        }
+    } catch (e) {
+        console.error('Error toggling student list gender:', e);
+    }
+
+    // 2. Sync in physicalTests
+    try {
+        const physicalList = await getPhysicalTests(className);
+        const pIdx = physicalList.findIndex(p => p.numeroEleve === numeroEleve);
+        if (pIdx >= 0) {
+            if (!newSexe) {
+                newSexe = physicalList[pIdx].sexe === 'F' ? 'M' : 'F';
+            }
+            physicalList[pIdx] = { ...physicalList[pIdx], sexe: newSexe };
+            await savePhysicalTests(className, physicalList);
+        }
+    } catch (e) {
+        console.error('Error syncing physical test gender:', e);
+    }
+
+    // 3. Sync in VMA results
+    try {
+        const vmaList = await getVmaResults(className);
+        const vIdx = vmaList.findIndex(v => v.numeroEleve === numeroEleve);
+        if (vIdx >= 0) {
+            if (!newSexe) {
+                newSexe = vmaList[vIdx].sexe === 'F' ? 'M' : 'F';
+            }
+            vmaList[vIdx] = { ...vmaList[vIdx], sexe: newSexe };
+            await saveVmaResults(className, vmaList);
+        }
+    } catch (e) {
+        console.error('Error syncing VMA result gender:', e);
+    }
+
+    window.dispatchEvent(new CustomEvent('dbUpdated'));
+    return newSexe;
+};
+
+/**
+ * Manually adds a student to a class list, generating next numeroEleve if empty.
+ */
+export const addStudentToClass = async (
+    className: string,
+    student: {
+        nomEleve: string;
+        numeroEleve?: string;
+        sexe?: 'M' | 'F';
+    }
+): Promise<{ success: boolean; student: StudentIdentity; error?: string }> => {
+    const trimmedClass = (className || '').trim();
+    const trimmedName = (student.nomEleve || '').trim();
+
+    if (!trimmedClass) {
+        return { success: false, student: { numeroEleve: '', nomEleve: '' }, error: 'يرجى تحديد أو إدخال اسم القسم' };
+    }
+    if (!trimmedName || isForbiddenStudentName(trimmedName)) {
+        return { success: false, student: { numeroEleve: '', nomEleve: '' }, error: 'يرجى إدخال اسم وتلميذ صالح' };
+    }
+
+    try {
+        const students = await getStudentList(trimmedClass);
+        
+        let finalNum = (student.numeroEleve || '').trim();
+        if (!finalNum) {
+            // Find max numeric ID or count + 1
+            const numericIds = students
+                .map(s => parseInt(s.numeroEleve, 10))
+                .filter(n => !isNaN(n));
+            const maxId = numericIds.length > 0 ? Math.max(...numericIds) : 0;
+            finalNum = String(maxId + 1);
+        }
+
+        // Check if student with same numero already exists
+        const existingIdx = students.findIndex(s => s.numeroEleve === finalNum);
+        const newStudent: StudentIdentity = {
+            numeroEleve: finalNum,
+            nomEleve: trimmedName,
+            sexe: student.sexe || 'M'
+        };
+
+        if (existingIdx >= 0) {
+            students[existingIdx] = newStudent;
+        } else {
+            students.push(newStudent);
+        }
+
+        await saveStudentList(trimmedClass, students);
+        window.dispatchEvent(new CustomEvent('dbUpdated'));
+
+        return { success: true, student: newStudent };
+    } catch (e: any) {
+        console.error('Error adding student to class:', e);
+        return { success: false, student: { numeroEleve: '', nomEleve: '' }, error: e?.message || 'حدث خطأ أثناء إضافة التلميذ' };
+    }
+};
+
+/**
+ * Deletes a student from a class roster across student list, physical tests, and VMA.
+ */
+export const deleteStudentFromClass = async (
+    className: string,
+    numeroEleve: string
+): Promise<void> => {
+    if (!className || !numeroEleve) return;
+
+    try {
+        // 1. Remove from studentLists
+        const students = await getStudentList(className);
+        const updatedStudents = students.filter(s => s.numeroEleve !== numeroEleve);
+        await saveStudentList(className, updatedStudents);
+
+        // 2. Remove from physicalTests
+        const physical = await getPhysicalTests(className);
+        const updatedPhysical = physical.filter(p => p.numeroEleve !== numeroEleve);
+        await savePhysicalTests(className, updatedPhysical);
+
+        // 3. Remove from VMA
+        const vma = await getVmaResults(className);
+        const updatedVma = vma.filter(v => v.numeroEleve !== numeroEleve);
+        await saveVmaResults(className, updatedVma);
+
+        window.dispatchEvent(new CustomEvent('dbUpdated'));
+    } catch (e) {
+        console.error('Error deleting student from class:', e);
+    }
 };

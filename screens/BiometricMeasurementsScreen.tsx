@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { getStudentList, getPhysicalTests, savePhysicalTests } from '../utils/db';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { getStudentList, getPhysicalTests, savePhysicalTests, getAllClasses, toggleStudentGender } from '../utils/db';
 import type { StudentIdentity, PhysicalTests } from '../types';
 import { 
     SaveIcon, 
@@ -43,6 +43,7 @@ export const BiometricMeasurementsScreen: React.FC<BiometricMeasurementsScreenPr
     sessionDate
 }) => {
     const { t } = useLanguage();
+    const [classList, setClassList] = useState<string[]>([]);
     const [studentList, setStudentList] = useState<StudentIdentity[]>([]);
     const [testsData, setTestsData] = useState<PhysicalTests[]>([]);
     const [selectedStudent, setSelectedStudent] = useState<StudentIdentity | null>(null);
@@ -59,7 +60,21 @@ export const BiometricMeasurementsScreen: React.FC<BiometricMeasurementsScreenPr
     }>({});
 
     const loadClassData = (className: string) => {
-        if (!className) return;
+        getAllClasses().then(cls => {
+            const names = cls.map(c => c.className);
+            setClassList(names);
+            if (names.length > 0 && (!className || !names.includes(className))) {
+                setSelectedClass(names[0]);
+                return;
+            }
+        });
+
+        if (!className) {
+            setStudentList([]);
+            setTestsData([]);
+            setSelectedStudent(null);
+            return;
+        }
 
         getStudentList(className).then(list => {
             const normalized = list.map(s => ({
@@ -84,6 +99,48 @@ export const BiometricMeasurementsScreen: React.FC<BiometricMeasurementsScreenPr
         window.addEventListener('dbUpdated', handleDbUpdate);
         return () => window.removeEventListener('dbUpdated', handleDbUpdate);
     }, [selectedClass]);
+
+    // Handle double-click / double-tap to toggle student gender
+    const lastGenderTapRef = useRef<{ [key: string]: number }>({});
+
+    const handleToggleStudentGender = async (studentNum: string) => {
+        if (!selectedClass) return;
+        try {
+            const newSexe = await toggleStudentGender(selectedClass, studentNum);
+            setStudentList(prev => prev.map(s => s.numeroEleve === studentNum ? { ...s, sexe: newSexe } : s));
+            setTestsData(prev => prev.map(t => t.numeroEleve === studentNum ? { ...t, sexe: newSexe } : t));
+            if (selectedStudent && selectedStudent.numeroEleve === studentNum) {
+                setSelectedStudent(prev => prev ? { ...prev, sexe: newSexe } : null);
+            }
+            const found = studentList.find(s => s.numeroEleve === studentNum);
+            const sName = found?.nomEleve || studentNum;
+            const gLabel = newSexe === 'M' ? t.male : t.female;
+            setNotification({
+                message: `${language === 'ar' ? 'تم تغيير جنس' : 'Sexe de'} ${sName} ${language === 'ar' ? 'إلى' : 'en'} ${gLabel} ${language === 'ar' ? 'بنجاح' : 'avec succès'}`,
+                type: 'success'
+            });
+        } catch (err) {
+            console.error('Failed to toggle student gender:', err);
+        }
+    };
+
+    const handleGenderInteraction = (studentNum: string, isTouch = false) => {
+        const now = Date.now();
+        const lastTap = lastGenderTapRef.current[studentNum] || 0;
+        
+        if (isTouch) {
+            if (now - lastTap < 380) {
+                lastGenderTapRef.current[studentNum] = 0;
+                handleToggleStudentGender(studentNum);
+            } else {
+                lastGenderTapRef.current[studentNum] = now;
+            }
+        } else {
+            if (now - lastTap < 400) return;
+            lastGenderTapRef.current[studentNum] = now;
+            handleToggleStudentGender(studentNum);
+        }
+    };
 
     // When selected student changes in card mode
     useEffect(() => {
@@ -266,13 +323,21 @@ export const BiometricMeasurementsScreen: React.FC<BiometricMeasurementsScreenPr
 
                 <div className="flex flex-wrap items-center gap-3">
                     <div>
-                        <input
-                            type="text"
-                            value={selectedClass}
-                            onChange={(e) => setSelectedClass(e.target.value)}
-                            className="block w-36 px-3 py-2 text-sm border border-gray-300 dark:bg-gray-700 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
-                            placeholder={t.class}
-                        />
+                        {classList.length > 0 ? (
+                            <select
+                                value={selectedClass}
+                                onChange={(e) => setSelectedClass(e.target.value)}
+                                className="block w-40 px-3 py-2 text-sm font-bold border border-gray-300 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer text-gray-900 dark:text-gray-100"
+                            >
+                                {classList.map(c => (
+                                    <option key={c} value={c}>{c}</option>
+                                ))}
+                            </select>
+                        ) : (
+                            <div className="px-3 py-2 text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl whitespace-nowrap">
+                                لا توجد أقسام مسجلة
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex items-center bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
@@ -420,12 +485,24 @@ export const BiometricMeasurementsScreen: React.FC<BiometricMeasurementsScreenPr
                                                     <PencilSquareIcon className="w-3.5 h-3.5 text-emerald-600 opacity-40 group-hover/name:opacity-100 transition-opacity" />
                                                 </button>
                                             </td>
-                                            <td className="py-2.5 px-2 text-center">
+                                            <td 
+                                                className="py-2.5 px-2 text-center cursor-pointer select-none"
+                                                title={language === 'ar' ? 'انقر مرتين لتغيير الجنس بين ذكر وأنثى' : 'Double-cliquez pour changer le sexe (M ↔ F)'}
+                                                onDoubleClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleGenderInteraction(student.numeroEleve, false);
+                                                }}
+                                                onTouchEnd={(e) => {
+                                                    e.stopPropagation();
+                                                    handleGenderInteraction(student.numeroEleve, true);
+                                                }}
+                                            >
                                                 {student.sexe && (
-                                                    <span className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${
-                                                        student.sexe === 'F' ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-300' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold transition-all duration-150 hover:scale-110 active:scale-95 shadow-2xs border ${
+                                                        student.sexe === 'F' ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-300 border-pink-200 dark:border-pink-800 hover:bg-pink-200' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-blue-200 dark:border-blue-800 hover:bg-blue-200'
                                                     }`}>
-                                                        {student.sexe === 'F' ? t.female : t.male}
+                                                        <span>{student.sexe === 'F' ? t.female : t.male}</span>
+                                                        <span className="text-[9px] opacity-40">⇄</span>
                                                     </span>
                                                 )}
                                             </td>
@@ -572,7 +649,22 @@ export const BiometricMeasurementsScreen: React.FC<BiometricMeasurementsScreenPr
                                             </span>
                                         </div>
                                         <p className="text-xs text-gray-500 mt-1">
-                                            {t.gender}: <strong>{selectedStudent.sexe === 'F' ? t.female : selectedStudent.sexe === 'M' ? t.male : t.unspecified}</strong>
+                                            {t.gender}:{' '}
+                                            <strong 
+                                                className="cursor-pointer select-none inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs transition-all duration-150 hover:scale-105 active:scale-95 border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 hover:border-emerald-500"
+                                                title={language === 'ar' ? 'انقر مرتين لتغيير الجنس بين ذكر وأنثى' : 'Double-cliquez pour changer le sexe'}
+                                                onDoubleClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleGenderInteraction(selectedStudent.numeroEleve, false);
+                                                }}
+                                                onTouchEnd={(e) => {
+                                                    e.stopPropagation();
+                                                    handleGenderInteraction(selectedStudent.numeroEleve, true);
+                                                }}
+                                            >
+                                                <span>{selectedStudent.sexe === 'F' ? t.female : selectedStudent.sexe === 'M' ? t.male : t.unspecified}</span>
+                                                <span className="text-[10px] opacity-50">⇄</span>
+                                            </strong>
                                         </p>
                                     </div>
 

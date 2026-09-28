@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { getStudentList, getPhysicalTests, savePhysicalTests, saveStudentList, getVmaResults, saveVmaResults, getAllClasses } from '../utils/db';
+import { getStudentList, getPhysicalTests, savePhysicalTests, saveStudentList, getVmaResults, saveVmaResults, getAllClasses, toggleStudentGender } from '../utils/db';
 import type { StudentIdentity, PhysicalTests, StudentResult } from '../types';
 import { 
     SaveIcon, 
@@ -83,8 +83,20 @@ export const PhysicalTestsScreen: React.FC<PhysicalTestsScreenProps> = ({
 
     // Load data when selectedClass changes
     const loadClassData = (className: string) => {
-        getAllClasses().then(cls => setClassList(cls.map(c => c.className)));
-        if (!className) return;
+        getAllClasses().then(cls => {
+            const names = cls.map(c => c.className);
+            setClassList(names);
+            if (names.length > 0 && (!className || !names.includes(className))) {
+                setSelectedClass(names[0]);
+                return;
+            }
+        });
+        if (!className) {
+            setStudentList([]);
+            setResults([]);
+            setVmaResults([]);
+            return;
+        }
         getStudentList(className).then(list => {
             const normalizedList = list.map(s => ({
                 ...s,
@@ -106,6 +118,51 @@ export const PhysicalTestsScreen: React.FC<PhysicalTestsScreenProps> = ({
         window.addEventListener('dbUpdated', handleDbUpdate);
         return () => window.removeEventListener('dbUpdated', handleDbUpdate);
     }, [selectedClass]);
+
+    // Handle double-click / double-tap to toggle student gender
+    const lastGenderTapRef = useRef<{ [key: string]: number }>({});
+
+    const handleToggleStudentGender = async (studentNum: string) => {
+        if (!selectedClass) return;
+        try {
+            const newSexe = await toggleStudentGender(selectedClass, studentNum);
+            // Optimistically update local states
+            setStudentList(prev => prev.map(s => s.numeroEleve === studentNum ? { ...s, sexe: newSexe } : s));
+            setResults(prev => prev.map(r => r.numeroEleve === studentNum ? { ...r, sexe: newSexe } : r));
+            setVmaResults(prev => prev.map(v => v.numeroEleve === studentNum ? { ...v, sexe: newSexe } : v));
+            if (selectedStudent && selectedStudent.numeroEleve === studentNum) {
+                setSelectedStudent(prev => prev ? { ...prev, sexe: newSexe } : null);
+            }
+            
+            const found = studentList.find(s => s.numeroEleve === studentNum);
+            const sName = found?.nomEleve || studentNum;
+            const gLabel = newSexe === 'M' ? 'ذكر' : 'أنثى';
+            setNotification({
+                message: `تم تغيير جنس ${sName} إلى ${gLabel} بنجاح`,
+                type: 'success'
+            });
+        } catch (err) {
+            console.error('Failed to toggle student gender:', err);
+        }
+    };
+
+    const handleGenderInteraction = (studentNum: string, isTouch = false) => {
+        const now = Date.now();
+        const lastTap = lastGenderTapRef.current[studentNum] || 0;
+        
+        if (isTouch) {
+            if (now - lastTap < 380) {
+                lastGenderTapRef.current[studentNum] = 0;
+                handleToggleStudentGender(studentNum);
+            } else {
+                lastGenderTapRef.current[studentNum] = now;
+            }
+        } else {
+            if (now - lastTap < 400) return;
+            lastGenderTapRef.current[studentNum] = now;
+            handleToggleStudentGender(studentNum);
+        }
+    };
 
     const handleSelectStudent = (student: StudentIdentity) => {
         setSelectedStudent(student);
@@ -494,14 +551,22 @@ export const PhysicalTestsScreen: React.FC<PhysicalTestsScreenProps> = ({
                         <label htmlFor="class-select" className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
                             القسم
                         </label>
-                        <input
-                            type="text"
-                            id="class-select"
-                            value={selectedClass}
-                            onChange={(e) => setSelectedClass(e.target.value)}
-                            className="block w-full sm:w-36 px-3 py-2 text-sm border border-gray-300 dark:bg-gray-700 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            placeholder="اسم القسم"
-                        />
+                        {classList.length > 0 ? (
+                            <select
+                                id="class-select"
+                                value={selectedClass}
+                                onChange={(e) => setSelectedClass(e.target.value)}
+                                className="block w-full sm:w-44 px-3 py-2 text-sm font-bold border border-gray-300 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer text-gray-900 dark:text-gray-100"
+                            >
+                                {classList.map(clsName => (
+                                    <option key={clsName} value={clsName}>{clsName}</option>
+                                ))}
+                            </select>
+                        ) : (
+                            <div className="px-3 py-2 text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl whitespace-nowrap">
+                                لا توجد أقسام مسجلة
+                            </div>
+                        )}
                     </div>
 
                     {/* View mode toggle */}
@@ -675,13 +740,25 @@ export const PhysicalTestsScreen: React.FC<PhysicalTestsScreenProps> = ({
                                                     {student.nomEleve}
                                                 </button>
                                             </td>
-                                             <td className="p-2">
-                                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                             <td 
+                                                className="p-2 cursor-pointer select-none"
+                                                title="انقر مرتين لتغيير الجنس بين ذكر وأنثى"
+                                                onDoubleClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleGenderInteraction(student.numeroEleve, false);
+                                                }}
+                                                onTouchEnd={(e) => {
+                                                    e.stopPropagation();
+                                                    handleGenderInteraction(student.numeroEleve, true);
+                                                }}
+                                            >
+                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold transition-all duration-150 hover:scale-110 active:scale-95 shadow-2xs border ${
                                                     student.sexe === 'F' 
-                                                        ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-300' 
-                                                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                                                        ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-300 border-pink-200 dark:border-pink-800 hover:bg-pink-200' 
+                                                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-blue-200 dark:border-blue-800 hover:bg-blue-200'
                                                 }`}>
-                                                    {student.sexe === 'F' ? 'أنثى' : 'ذكر'}
+                                                    <span>{student.sexe === 'F' ? 'أنثى' : 'ذكر'}</span>
+                                                    <span className="text-[9px] opacity-40">⇄</span>
                                                 </span>
                                             </td>
 
@@ -887,10 +964,24 @@ export const PhysicalTestsScreen: React.FC<PhysicalTestsScreenProps> = ({
                                                 </div>
                                                 <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-2">
                                                     {student.sexe && (
-                                                        <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
-                                                            student.sexe === 'F' ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-300' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
-                                                        }`}>
-                                                            {student.sexe === 'F' ? 'أنثى' : 'ذكر'}
+                                                        <span 
+                                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-all duration-150 hover:scale-105 active:scale-95 border ${
+                                                                student.sexe === 'F' 
+                                                                    ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-300 border-pink-200 dark:border-pink-800' 
+                                                                    : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+                                                            }`}
+                                                            title="انقر مرتين لتغيير الجنس بين ذكر وأنثى"
+                                                            onDoubleClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleGenderInteraction(student.numeroEleve, false);
+                                                            }}
+                                                            onTouchEnd={(e) => {
+                                                                e.stopPropagation();
+                                                                handleGenderInteraction(student.numeroEleve, true);
+                                                            }}
+                                                        >
+                                                            <span>{student.sexe === 'F' ? 'أنثى' : 'ذكر'}</span>
+                                                            <span className="text-[9px] opacity-40">⇄</span>
                                                         </span>
                                                     )}
                                                 </div>

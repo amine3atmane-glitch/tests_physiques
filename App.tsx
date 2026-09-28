@@ -11,7 +11,7 @@ import { OfflineIndicator } from './components/OfflineIndicator';
 
 const MainLayout: React.FC = () => {
   const [activeScreen, setActiveScreen] = useState<ActiveScreen>('classes');
-  const [selectedClass, setSelectedClass] = useState<string>('Classe 1');
+  const [selectedClass, setSelectedClass] = useState<string>('');
   const [groupSize, setGroupSize] = useState<number>(8); // For affinity groups
   const [sessionDate, setSessionDate] = useState<string>(''); // Empty string means "now"
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
@@ -22,14 +22,25 @@ const MainLayout: React.FC = () => {
     const initClass = async () => {
       try {
         const classes = await getAllClasses();
-        if (classes.length > 0 && selectedClass === 'Classe 1') {
-          setSelectedClass(classes[0].className);
+        if (classes.length > 0) {
+          setSelectedClass(prev => {
+            if (!prev || !classes.some(c => c.className === prev)) {
+              return classes[0].className;
+            }
+            return prev;
+          });
+        } else {
+          setSelectedClass('');
         }
       } catch (err) {
         console.error('Failed to init class', err);
       }
     };
     initClass();
+
+    const handleDbUpdate = () => initClass();
+    window.addEventListener('dbUpdated', handleDbUpdate);
+    return () => window.removeEventListener('dbUpdated', handleDbUpdate);
   }, []);
 
   return (

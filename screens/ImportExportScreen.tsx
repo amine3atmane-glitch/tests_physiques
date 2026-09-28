@@ -1,9 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
     parseStudentExcel, 
+    parseTarlStudentExcel,
+    parseAnyStudentExcel,
     parsePhysicalTestsExcel, 
     downloadPhysicalTestsTemplate, 
     downloadStudentsTemplate,
+    downloadTarlStudentsTemplate,
     ParsedPhysicalTestsData
 } from '../utils/excelHelper';
 import { 
@@ -12,7 +15,8 @@ import {
     getPhysicalTests, 
     savePhysicalTests, 
     getVmaResults, 
-    saveVmaResults 
+    saveVmaResults,
+    getAllClasses 
 } from '../utils/db';
 import { exportGroupsToWord } from '../utils/wordHelper';
 import { generateAffinityGroups } from '../utils/groupHelper';
@@ -59,13 +63,32 @@ export const ImportExportScreen: React.FC<ImportExportScreenProps> = ({
     groupSize
 }) => {
     const { t } = useLanguage();
+    const [classList, setClassList] = useState<string[]>([]);
 
     // Feedback notifications
     const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
+    useEffect(() => {
+        const fetchClasses = async () => {
+            const cls = await getAllClasses();
+            const names = cls.map(c => c.className);
+            setClassList(names);
+            if (names.length > 0 && (!selectedClass || !names.includes(selectedClass))) {
+                setSelectedClass(names[0]);
+            } else if (names.length === 0 && selectedClass) {
+                setSelectedClass('');
+            }
+        };
+        fetchClasses();
+        window.addEventListener('dbUpdated', fetchClasses);
+        return () => window.removeEventListener('dbUpdated', fetchClasses);
+    }, [selectedClass]);
+
     // 1. Student list import state
     const [importingStudents, setImportingStudents] = useState(false);
     const [importedGroups, setImportedGroups] = useState<{ className: string; students: StudentIdentity[] }[]>([]);
+    const [selectedGroupIndices, setSelectedGroupIndices] = useState<Set<number>>(new Set());
+    const [studentListType, setStudentListType] = useState<'massar' | 'tarl'>('massar');
     const studentFileInputRef = useRef<HTMLInputElement>(null);
 
     // 2. Physical tests & VMA import state
@@ -95,7 +118,7 @@ export const ImportExportScreen: React.FC<ImportExportScreenProps> = ({
             
             for (let i = 0; i < files.length; i++) {
                 const arrayBuffer = await files[i].arrayBuffer();
-                const fileResults = parseStudentExcel(arrayBuffer);
+                const fileResults = parseAnyStudentExcel(arrayBuffer, studentListType);
                 allGroups.push(...fileResults);
             }
 
@@ -103,8 +126,9 @@ export const ImportExportScreen: React.FC<ImportExportScreenProps> = ({
                 setMessage({ text: "لم يتم العثور على أي لوائح تلاميذ في الملفات المختارة.", type: 'error' });
             } else {
                 setImportedGroups(allGroups);
+                setSelectedGroupIndices(new Set(allGroups.map((_, i) => i)));
                 const totalStudents = allGroups.reduce((acc, g) => acc + g.students.length, 0);
-                setMessage({ text: `تم اكتشاف ${allGroups.length} أقسام (${totalStudents} تلميذ). يرجى التأكيد للحفظ.`, type: 'success' });
+                setMessage({ text: `تم اكتشاف ${allGroups.length} أقسام (${totalStudents} تلميذ). يمكنك تحديد الأقسام المراد استيرادها أدناه.`, type: 'success' });
             }
         } catch (err: any) {
             setMessage({ text: err.message || "خطأ أثناء قراءة ملفات Excel.", type: 'error' });
@@ -113,23 +137,61 @@ export const ImportExportScreen: React.FC<ImportExportScreenProps> = ({
         }
     };
 
+    const toggleGroupSelection = (index: number) => {
+        setSelectedGroupIndices(prev => {
+            const next = new Set(prev);
+            if (next.has(index)) next.delete(index);
+            else next.add(index);
+            return next;
+        });
+    };
+
+    const selectAllGroups = (selectAll: boolean) => {
+        if (selectAll) {
+            setSelectedGroupIndices(new Set(importedGroups.map((_, i) => i)));
+        } else {
+            setSelectedGroupIndices(new Set());
+        }
+    };
+
     const confirmStudentImport = async () => {
-        if (importedGroups.length === 0) return;
+        const toImport = importedGroups.filter((_, idx) => selectedGroupIndices.has(idx));
+        if (toImport.length === 0) {
+            setMessage({ text: "يرجى تحديد قسم واحد على الأقل للاستيراد.", type: 'error' });
+            return;
+        }
         try {
-            for (const group of importedGroups) {
+            for (const group of toImport) {
                 await saveStudentList(group.className, group.students);
             }
 
-            if (importedGroups.length === 1) {
-                setSelectedClass(importedGroups[0].className);
+            if (toImport.length === 1) {
+                setSelectedClass(toImport[0].className);
             }
 
-            setMessage({ text: `تم استيراد وحفظ ${importedGroups.length} لوائح بنجاح.`, type: 'success' });
+            setMessage({ text: `تم استيراد وحفظ ${toImport.length} لوائح بنجاح.`, type: 'success' });
             window.dispatchEvent(new CustomEvent('dbUpdated'));
             setImportedGroups([]);
+            setSelectedGroupIndices(new Set());
             if (studentFileInputRef.current) studentFileInputRef.current.value = '';
         } catch (err) {
             setMessage({ text: "خطأ أثناء حفظ لوائح التلاميذ.", type: 'error' });
+        }
+    };
+
+    const importSingleGroupDirectly = async (index: number) => {
+        const group = importedGroups[index];
+        if (!group) return;
+        try {
+            await saveStudentList(group.className, group.students);
+            setSelectedClass(group.className);
+            setMessage({ text: `تم استيراد وحفظ القسم "${group.className}" (${group.students.length} تلميذ) بنجاح.`, type: 'success' });
+            window.dispatchEvent(new CustomEvent('dbUpdated'));
+            setImportedGroups([]);
+            setSelectedGroupIndices(new Set());
+            if (studentFileInputRef.current) studentFileInputRef.current.value = '';
+        } catch (err) {
+            setMessage({ text: "خطأ أثناء حفظ القسم.", type: 'error' });
         }
     };
 
@@ -422,13 +484,21 @@ export const ImportExportScreen: React.FC<ImportExportScreenProps> = ({
 
                 <div className="flex items-center gap-2">
                     <label className="text-xs font-semibold text-gray-500 dark:text-gray-400">{t.class}:</label>
-                    <input
-                        type="text"
-                        value={selectedClass}
-                        onChange={(e) => setSelectedClass(e.target.value)}
-                        className="px-3 py-1.5 text-sm font-bold border border-gray-300 dark:bg-gray-700 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                        placeholder={t.classNamePlaceholder}
-                    />
+                    {classList.length > 0 ? (
+                        <select
+                            value={selectedClass}
+                            onChange={(e) => setSelectedClass(e.target.value)}
+                            className="px-3 py-1.5 text-sm font-bold border border-gray-300 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 cursor-pointer text-gray-900 dark:text-gray-100"
+                        >
+                            {classList.map(c => (
+                                <option key={c} value={c}>{c}</option>
+                            ))}
+                        </select>
+                    ) : (
+                        <span className="text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1.5 rounded-xl border border-amber-200 dark:border-amber-800">
+                            لا توجد أقسام مسجلة
+                        </span>
+                    )}
                 </div>
             </div>
 
@@ -441,9 +511,38 @@ export const ImportExportScreen: React.FC<ImportExportScreenProps> = ({
                             <ExcelIcon />
                             <h2 className="text-lg font-bold text-gray-900 dark:text-white">{t.importStudentsCard}</h2>
                         </div>
-                        <p className="text-xs text-gray-600 dark:text-gray-300 mb-4">
+                        <p className="text-xs text-gray-600 dark:text-gray-300 mb-3">
                             {t.importStudentsDesc}
                         </p>
+
+                        {/* List Type Selector (Massar vs TaRL) */}
+                        <div className="mb-4 p-1.5 bg-gray-100 dark:bg-gray-750 rounded-xl flex items-center gap-1.5">
+                            <button
+                                type="button"
+                                onClick={() => setStudentListType('massar')}
+                                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                                    studentListType === 'massar'
+                                        ? 'bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'
+                                }`}
+                            >
+                                <span>📋</span>
+                                <span>لائحة مسار لقسم</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setStudentListType('tarl')}
+                                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                                    studentListType === 'tarl'
+                                        ? 'bg-emerald-600 text-white shadow-xs'
+                                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'
+                                }`}
+                            >
+                                <span>🎯</span>
+                                <span>لائحة قسم طارل (TaRL)</span>
+                            </button>
+                        </div>
 
                         {!importedGroups.length ? (
                             <div className="border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl p-6 text-center bg-gray-50/50 dark:bg-gray-900/20">
@@ -459,38 +558,94 @@ export const ImportExportScreen: React.FC<ImportExportScreenProps> = ({
                                 />
                                 <label
                                     htmlFor="student-excel-upload"
-                                    className={`cursor-pointer inline-flex items-center px-4 py-2 text-sm font-bold rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 transition ${importingStudents ? 'opacity-50' : ''}`}
+                                    className={`cursor-pointer inline-flex items-center px-4 py-2 text-sm font-bold rounded-xl text-white ${
+                                        studentListType === 'tarl' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'
+                                    } transition ${importingStudents ? 'opacity-50' : ''}`}
                                 >
-                                    {importingStudents ? 'جاري التحليل...' : 'اختيار ملفات إكسيل (مسار)'}
+                                    {importingStudents 
+                                        ? 'جاري التحليل...' 
+                                        : (studentListType === 'tarl' ? 'اختيار ملف إكسيل (طارل - الدعم)' : 'اختيار ملفات إكسيل (مسار)')}
                                 </label>
-                                <p className="text-[10px] text-gray-500 mt-2">يمكنك اختيار عدة ملفات أو ملف واحد به عدة أوراق عمل</p>
+                                <p className="text-[10px] text-gray-500 mt-2">
+                                    {studentListType === 'tarl'
+                                        ? 'يدعم ملفات مجموعات الدعم وأفواج طارل ومسار'
+                                        : 'يمكنك اختيار عدة ملفات أو ملف واحد به عدة أوراق عمل'}
+                                </p>
                             </div>
                         ) : (
                             <div className="space-y-4 bg-indigo-50/50 dark:bg-indigo-950/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-900">
-                                <div className="text-sm font-bold text-indigo-900 dark:text-indigo-200 border-b border-indigo-100 dark:border-indigo-800 pb-2 mb-2">
-                                    ✓ تم اكتشاف {importedGroups.length} لوائح تلاميذ:
+                                <div className="flex items-center justify-between border-b border-indigo-100 dark:border-indigo-800 pb-2 mb-2 flex-wrap gap-2">
+                                    <span className="text-sm font-bold text-indigo-900 dark:text-indigo-200">
+                                        ✓ تم اكتشاف {importedGroups.length} لوائح أقسام (محدد: {selectedGroupIndices.size}):
+                                    </span>
+                                    <div className="flex items-center gap-1.5 text-xs">
+                                        <button
+                                            type="button"
+                                            onClick={() => selectAllGroups(true)}
+                                            className="px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/60 text-indigo-800 dark:text-indigo-200 font-bold hover:bg-indigo-200 transition"
+                                        >
+                                            تحديد الكل
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => selectAllGroups(false)}
+                                            className="px-2 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold hover:bg-gray-300 transition"
+                                        >
+                                            إلغاء التحديد
+                                        </button>
+                                    </div>
                                 </div>
-                                <div className="max-h-40 overflow-y-auto space-y-2 pr-1">
-                                    {importedGroups.map((group, idx) => (
-                                        <div key={idx} className="flex justify-between items-center bg-white dark:bg-gray-800 p-2 rounded-lg border border-indigo-100 dark:border-indigo-800 text-xs">
-                                            <span className="font-bold text-gray-700 dark:text-gray-200">{group.className}</span>
-                                            <span className="bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full font-medium">
-                                                {group.students.length} تلميذ
-                                            </span>
-                                        </div>
-                                    ))}
+
+                                <div className="max-h-52 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                                    {importedGroups.map((group, idx) => {
+                                        const isSelected = selectedGroupIndices.has(idx);
+                                        return (
+                                            <div 
+                                                key={idx} 
+                                                className={`flex justify-between items-center p-2 rounded-xl border text-xs transition ${
+                                                    isSelected 
+                                                        ? 'bg-white dark:bg-gray-800 border-indigo-300 dark:border-indigo-600 shadow-2xs' 
+                                                        : 'bg-gray-50/80 dark:bg-gray-800/40 border-gray-200 dark:border-gray-700 opacity-60'
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isSelected}
+                                                        onChange={() => toggleGroupSelection(idx)}
+                                                        className="w-4 h-4 rounded text-indigo-600 border-gray-300 focus:ring-indigo-500 cursor-pointer"
+                                                    />
+                                                    <span className="font-bold text-gray-800 dark:text-gray-100 truncate">{group.className}</span>
+                                                    <span className="bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full font-medium text-[10px]">
+                                                        {group.students.length} تلميذ
+                                                    </span>
+                                                </div>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => importSingleGroupDirectly(idx)}
+                                                    className="px-2 py-1 text-[11px] font-bold rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50/60 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 transition whitespace-nowrap cursor-pointer"
+                                                    title="استيراد هذا القسم فقط"
+                                                >
+                                                    استيراد هذا فقط ⚡
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
+
                                 <div className="flex gap-2 pt-2">
                                     <button
                                         onClick={confirmStudentImport}
-                                        className="flex-1 py-2 text-xs font-bold rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 transition flex items-center justify-center gap-1"
+                                        disabled={selectedGroupIndices.size === 0}
+                                        className="flex-1 py-2 text-xs font-bold rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                                     >
                                         <SaveIcon className="w-4 h-4" />
-                                        {t.confirm} {importedGroups.length > 1 ? `(${importedGroups.length} لوائح)` : ''}
+                                        <span>تأكيد استيراد وحفظ الأقسام المحددة ({selectedGroupIndices.size})</span>
                                     </button>
                                     <button
-                                        onClick={() => { setImportedGroups([]); if (studentFileInputRef.current) studentFileInputRef.current.value = ''; }}
-                                        className="px-3 py-2 text-xs font-bold rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 transition"
+                                        onClick={() => { setImportedGroups([]); setSelectedGroupIndices(new Set()); if (studentFileInputRef.current) studentFileInputRef.current.value = ''; }}
+                                        className="px-3 py-2 text-xs font-bold rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 transition cursor-pointer"
                                     >
                                         {t.cancel}
                                     </button>
@@ -521,6 +676,7 @@ export const ImportExportScreen: React.FC<ImportExportScreenProps> = ({
                                     onChange={handlePhysicalFileUpload}
                                     className="hidden"
                                     id="physical-excel-upload"
+                                    multiple={false}
                                 />
                                 <label
                                     htmlFor="physical-excel-upload"
@@ -583,28 +739,36 @@ export const ImportExportScreen: React.FC<ImportExportScreenProps> = ({
                         <DocumentTextIcon />
                         <h2 className="text-lg font-bold text-gray-900 dark:text-white">{t.downloadTemplatesCard}</h2>
                     </div>
-                    <p className="text-xs text-gray-600 dark:text-gray-300 mb-5">
+                    <p className="text-xs text-gray-600 dark:text-gray-300 mb-4">
                         {t.downloadTemplatesDesc}
                     </p>
 
-                    <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                         <button
                             onClick={async () => {
                                 const students = await getStudentList(selectedClass);
                                 downloadPhysicalTestsTemplate(selectedClass, students);
                             }}
-                            className="flex-1 py-2.5 px-4 text-xs font-bold rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/70 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition flex items-center justify-center gap-2"
+                            className="py-2.5 px-3 text-xs font-bold rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/70 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition flex items-center justify-center gap-1.5"
                         >
-                            <ArrowDownTrayIcon />
+                            <ArrowDownTrayIcon className="w-3.5 h-3.5" />
                             <span>{t.templatePhysical}</span>
                         </button>
 
                         <button
                             onClick={() => downloadStudentsTemplate(selectedClass)}
-                            className="flex-1 py-2.5 px-4 text-xs font-bold rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-100 transition flex items-center justify-center gap-2"
+                            className="py-2.5 px-3 text-xs font-bold rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 transition flex items-center justify-center gap-1.5"
                         >
-                            <ArrowDownTrayIcon />
-                            <span>{t.templateStudents}</span>
+                            <ArrowDownTrayIcon className="w-3.5 h-3.5" />
+                            <span>{language === 'ar' ? 'نموذج لائحة مسار' : 'Modèle Massar'}</span>
+                        </button>
+
+                        <button
+                            onClick={() => downloadTarlStudentsTemplate('طارل - الفوج 1')}
+                            className="py-2.5 px-3 text-xs font-bold rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 transition flex items-center justify-center gap-1.5"
+                        >
+                            <ArrowDownTrayIcon className="w-3.5 h-3.5" />
+                            <span>{language === 'ar' ? 'نموذج لائحة طارل' : 'Modèle TaRL'}</span>
                         </button>
                     </div>
                 </div>

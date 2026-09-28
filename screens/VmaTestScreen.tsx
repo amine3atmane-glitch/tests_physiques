@@ -9,7 +9,7 @@ import { ResultsTable } from '../components/ResultsTable';
 import { GroupsModal } from '../components/GroupsModal';
 import { StudentDataModal } from '../components/StudentDataModal';
 import type { AffinityGroup, StudentIdentity } from '../types';
-import { getStudentList, saveStudentList, getAllClasses, ClassStats } from '../utils/db';
+import { getStudentList, saveStudentList, getAllClasses, ClassStats, toggleStudentGender } from '../utils/db';
 import { useLanguage } from '../utils/i18n';
 import { TrashIcon, ChevronDownIcon } from '../components/Icons';
 
@@ -30,6 +30,7 @@ export const VmaTestScreen: React.FC<VmaTestScreenProps> = ({ selectedClass, set
         currentLevel, 
         finishedStudents, 
         results, 
+        setResults,
         startTest, 
         stopTest, 
         clearAllData,
@@ -70,11 +71,13 @@ export const VmaTestScreen: React.FC<VmaTestScreenProps> = ({ selectedClass, set
         const fetchClasses = async () => {
             const classes = await getAllClasses();
             setClassList(classes);
-            // If selectedClass is default/not found and classes exist, select first class
-            if (classes.length > 0 && (!selectedClass || selectedClass === '6ème A')) {
-                if (!classes.some(c => c.className === selectedClass)) {
+            // If selectedClass is not in classes, select first class
+            if (classes.length > 0) {
+                if (!selectedClass || !classes.some(c => c.className === selectedClass)) {
                     setSelectedClass(classes[0].className);
                 }
+            } else if (selectedClass) {
+                setSelectedClass('');
             }
         };
 
@@ -96,32 +99,21 @@ export const VmaTestScreen: React.FC<VmaTestScreenProps> = ({ selectedClass, set
         setIsModalOpen(true);
     };
 
-    // Toggle gender manually
-    const handleToggleGender = (id: string) => {
-        setStudentList(prevList => {
-            const existingStudentIndex = prevList.findIndex(s => s.numeroEleve === id);
-            let newList = [...prevList];
-
-            if (existingStudentIndex >= 0) {
-                // Toggle: M -> F -> undefined -> M
-                const currentSexe = newList[existingStudentIndex].sexe;
-                let newSexe: 'M' | 'F' | undefined;
-                if (currentSexe === 'M') newSexe = 'F';
-                else if (currentSexe === 'F') newSexe = undefined;
-                else newSexe = 'M';
-                
-                newList[existingStudentIndex] = { ...newList[existingStudentIndex], sexe: newSexe };
-            } else {
-                // If student doesn't exist in list yet, create it with Male default
-                newList.push({ numeroEleve: id, nomEleve: '', sexe: 'M' });
-            }
-            
-            // Auto save
-            saveStudentList(selectedClass, newList).then(() => {
-                window.dispatchEvent(new CustomEvent('dbUpdated'));
-            });
-            return newList;
-        });
+    // Toggle gender manually (M <-> F)
+    const handleToggleGender = async (id: string) => {
+        if (!selectedClass) return;
+        try {
+            const newSexe = await toggleStudentGender(selectedClass, id);
+            setStudentList(prevList => prevList.map(s => s.numeroEleve === id ? { ...s, sexe: newSexe } : s));
+            setResults(prevResults => prevResults.map(r => r.numeroEleve === id ? { ...r, sexe: newSexe } : r));
+            const found = studentList.find(s => s.numeroEleve === id);
+            const sName = found?.nomEleve || id;
+            const genderLabel = newSexe === 'M' ? (language === 'ar' ? 'ذكر' : 'G') : (language === 'ar' ? 'أنثى' : 'F');
+            setNotificationToast(language === 'ar' ? `تم تغيير جنس ${sName} إلى ${genderLabel} بنجاح` : `Sexe de ${sName} changé en ${genderLabel}`);
+            setTimeout(() => setNotificationToast(null), 2500);
+        } catch (err) {
+            console.error('Failed to toggle student gender in VMA screen', err);
+        }
     };
 
     return (
@@ -284,6 +276,7 @@ export const VmaTestScreen: React.FC<VmaTestScreenProps> = ({ selectedClass, set
                     onClearAll={() => setIsClearConfirmOpen(true)}
                     onGenerateGroups={handleGenerateGroups}
                     selectedClass={selectedClass}
+                    onToggleGender={handleToggleGender}
                 />
             </section>
             

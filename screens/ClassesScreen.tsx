@@ -14,9 +14,13 @@ import {
   ArrowUpTrayIcon,
   PencilSquareIcon,
   ExcelIcon,
-  ArrowDownTrayIcon
+  ArrowDownTrayIcon,
+  UserPlusIcon,
+  PlusIcon
 } from '../components/Icons';
 import { StudentDataModal } from '../components/StudentDataModal';
+import { AddStudentModal } from '../components/AddStudentModal';
+import { ImportTypeSelectorModal, StudentListType } from '../components/ImportTypeSelectorModal';
 import { useLanguage } from '../utils/i18n';
 import { 
   getAllClasses, 
@@ -24,15 +28,20 @@ import {
   deleteClass, 
   getStudentList, 
   getPhysicalTests, 
-  getVmaResults,
-  saveStudentList
+  getVmaResults, 
+  saveStudentList,
+  toggleStudentGender,
+  deleteStudentFromClass
 } from '../utils/db';
 import {
   exportClassPhysicalTestsToExcel,
   exportClassMeasurementsToExcel,
   exportClassVmaResultsToExcel,
   parseStudentExcel,
-  downloadStudentsTemplate
+  parseTarlStudentExcel,
+  parseAnyStudentExcel,
+  downloadStudentsTemplate,
+  downloadTarlStudentsTemplate
 } from '../utils/excelHelper';
 import type { StudentIdentity, PhysicalTests, StudentResult } from '../types';
 import type { ActiveScreen } from '../components/Sidebar';
@@ -69,13 +78,41 @@ export const ClassesScreen: React.FC<ClassesScreenProps> = ({
   const [rosterStudents, setRosterStudents] = useState<StudentStatusRow[]>([]);
   const [rosterSearch, setRosterSearch] = useState('');
 
-  // Delete Confirmation Modal
+  // Delete Confirmation Modal (Class)
   const [classToDelete, setClassToDelete] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Delete Confirmation Modal (Student)
+  const [studentToDelete, setStudentToDelete] = useState<{ className: string; numeroEleve: string; nomEleve: string } | null>(null);
+  const [deletingStudent, setDeletingStudent] = useState(false);
 
   // Notification / Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [modalStudentNumber, setModalStudentNumber] = useState<string | null>(null);
+
+  // Add Student Modal State
+  const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
+  const [addStudentDefaultClass, setAddStudentDefaultClass] = useState<string>('');
+
+  // Import Type Selector Modal State (Massar vs TaRL)
+  const [isTypeSelectorOpen, setIsTypeSelectorOpen] = useState(false);
+  const [currentImportType, setCurrentImportType] = useState<StudentListType>('massar');
+
+  // Multi-Class & Single-Class Import Modal State
+  interface DetectedImportClass {
+    id: string;
+    originalClassName: string;
+    className: string;
+    students: StudentIdentity[];
+    boysCount: number;
+    girlsCount: number;
+    selected: boolean;
+  }
+
+  const [detectedImportClasses, setDetectedImportClasses] = useState<DetectedImportClass[]>([]);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importingInProgress, setImportingInProgress] = useState(false);
+  const [importFilterQuery, setImportFilterQuery] = useState('');
 
   const fetchClassesData = async () => {
     setLoading(true);
@@ -102,59 +139,58 @@ export const ClassesScreen: React.FC<ClassesScreenProps> = ({
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Direct Multi-Class and Multi-File Student Roster Import (Excel)
+  // Start import with selected list type (Massar or TaRL)
+  const handleStartImportWithType = (type: StudentListType) => {
+    setCurrentImportType(type);
+    setIsTypeSelectorOpen(false);
+    setTimeout(() => {
+      fileInputRef.current?.click();
+    }, 100);
+  };
+
+  // Parse Student Excel Files and Open Import Selector Modal
   const handleImportStudentExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     try {
-      showToast(language === 'ar' ? 'جاري قراءة واستيراد الأقسام...' : 'Lecture et importation des classes...');
-      let importedTotal = 0;
-      const classesImportedSet = new Set<string>();
+      showToast(
+        language === 'ar'
+          ? currentImportType === 'tarl'
+            ? 'جاري قراءة وتحليل لوائح طارل (مجموعات الدعم)...'
+            : 'جاري قراءة وتحليل لوائح مسار...'
+          : 'Analyse des fichiers Excel...'
+      );
+      const detected: DetectedImportClass[] = [];
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const buffer = await file.arrayBuffer();
-        const parsedGroups = parseStudentExcel(buffer);
+        const parsedGroups = parseAnyStudentExcel(buffer, currentImportType);
 
-        for (const group of parsedGroups) {
+        parsedGroups.forEach((group, gIdx) => {
           if (group.students.length > 0) {
-            // Merge with existing students or save new list
-            const existingList = await getStudentList(group.className);
-            const studentMap = new Map<string, StudentIdentity>();
-            existingList.forEach(s => studentMap.set(s.numeroEleve, s));
-            group.students.forEach(s => {
-              if (studentMap.has(s.numeroEleve)) {
-                studentMap.set(s.numeroEleve, {
-                  ...studentMap.get(s.numeroEleve)!,
-                  nomEleve: s.nomEleve || studentMap.get(s.numeroEleve)!.nomEleve,
-                  sexe: s.sexe || studentMap.get(s.numeroEleve)!.sexe
-                });
-              } else {
-                studentMap.set(s.numeroEleve, s);
-              }
+            const boys = group.students.filter(s => s.sexe === 'M').length;
+            const girls = group.students.filter(s => s.sexe === 'F').length;
+            detected.push({
+              id: `${i}_${gIdx}_${group.className}`,
+              originalClassName: group.className,
+              className: group.className,
+              students: group.students,
+              boysCount: boys,
+              girlsCount: girls,
+              selected: true // Selected by default
             });
-
-            const mergedList = Array.from(studentMap.values());
-            await saveStudentList(group.className, mergedList);
-            importedTotal += group.students.length;
-            classesImportedSet.add(group.className);
           }
-        }
+        });
       }
 
-      const classesImported = Array.from(classesImportedSet);
-
-      if (importedTotal > 0) {
-        window.dispatchEvent(new Event('dbUpdated'));
-        await fetchClassesData();
-        showToast(
-          language === 'ar' 
-            ? `تم استيراد ${importedTotal} تلميذ بنجاح (${classesImported.length} قسم: ${classesImported.join('، ')})` 
-            : `${importedTotal} élèves importés avec succès (${classesImported.length} classe(s))`
-        );
+      if (detected.length === 0) {
+        showToast(language === 'ar' ? 'لم يتم العثور على لوائح تلاميذ صالحة في الملفات.' : 'Aucune liste valide trouvée.');
       } else {
-        showToast(language === 'ar' ? 'لم يتم العثور على بيانات صالحة في الملفات.' : 'Aucune donnée valide trouvée.');
+        setDetectedImportClasses(detected);
+        setImportFilterQuery('');
+        setIsImportModalOpen(true);
       }
     } catch (err: any) {
       console.error(err);
@@ -164,6 +200,140 @@ export const ClassesScreen: React.FC<ClassesScreenProps> = ({
         e.target.value = '';
       }
     }
+  };
+
+  // Open manual add student dialog
+  const handleOpenAddStudent = (targetClassToSet?: string) => {
+    setAddStudentDefaultClass(targetClassToSet || rosterClass || selectedClass || (classes[0]?.className || ''));
+    setIsAddStudentOpen(true);
+  };
+
+  // Callback when a student is manually added
+  const handleStudentAddedSuccessfully = (className: string, student: StudentIdentity) => {
+    showToast(
+      language === 'ar'
+        ? `تم بنجاح إضافة التلميذ ${student.nomEleve} إلى القسم ${className}`
+        : `Élève ${student.nomEleve} ajouté à ${className}`
+    );
+    fetchClassesData();
+    if (rosterClass && rosterClass === className) {
+      handleOpenRoster(className);
+    }
+  };
+
+  // Delete student confirmation
+  const handleConfirmDeleteStudent = async () => {
+    if (!studentToDelete) return;
+    setDeletingStudent(true);
+    try {
+      await deleteStudentFromClass(studentToDelete.className, studentToDelete.numeroEleve);
+      showToast(
+        language === 'ar'
+          ? `تم حذف التلميذ ${studentToDelete.nomEleve} من القسم ${studentToDelete.className} بنجاح`
+          : `Élève ${studentToDelete.nomEleve} supprimé`
+      );
+      if (rosterClass && rosterClass === studentToDelete.className) {
+        handleOpenRoster(studentToDelete.className);
+      }
+      fetchClassesData();
+      setStudentToDelete(null);
+    } catch (err) {
+      console.error('Failed to delete student', err);
+    } finally {
+      setDeletingStudent(false);
+    }
+  };
+
+  // Toggle selection for a single class in the import modal
+  const handleToggleClassSelect = (id: string) => {
+    setDetectedImportClasses(prev => prev.map(c => c.id === id ? { ...c, selected: !c.selected } : c));
+  };
+
+  // Select all or deselect all
+  const handleSelectAllImport = (select: boolean) => {
+    setDetectedImportClasses(prev => prev.map(c => ({ ...c, selected: select })));
+  };
+
+  // Select only one class (and deselect all others)
+  const handleSelectSingleClass = (id: string) => {
+    setDetectedImportClasses(prev => prev.map(c => ({ ...c, selected: c.id === id })));
+  };
+
+  // Rename a detected class before saving
+  const handleUpdateClassName = (id: string, newName: string) => {
+    setDetectedImportClasses(prev => prev.map(c => c.id === id ? { ...c, className: newName } : c));
+  };
+
+  // Save selected classes to database
+  const saveImportedGroupsToDB = async (groupsToSave: DetectedImportClass[]) => {
+    setImportingInProgress(true);
+    try {
+      let totalStudentsImported = 0;
+      const importedClassNames: string[] = [];
+
+      for (const item of groupsToSave) {
+        const cleanName = item.className.trim();
+        if (!cleanName) continue;
+
+        const existingList = await getStudentList(cleanName);
+        const studentMap = new Map<string, StudentIdentity>();
+        existingList.forEach(s => studentMap.set(s.numeroEleve, s));
+        item.students.forEach(s => {
+          if (studentMap.has(s.numeroEleve)) {
+            studentMap.set(s.numeroEleve, {
+              ...studentMap.get(s.numeroEleve)!,
+              nomEleve: s.nomEleve || studentMap.get(s.numeroEleve)!.nomEleve,
+              sexe: s.sexe || studentMap.get(s.numeroEleve)!.sexe
+            });
+          } else {
+            studentMap.set(s.numeroEleve, s);
+          }
+        });
+
+        const mergedList = Array.from(studentMap.values());
+        await saveStudentList(cleanName, mergedList);
+        totalStudentsImported += item.students.length;
+        importedClassNames.push(cleanName);
+      }
+
+      window.dispatchEvent(new Event('dbUpdated'));
+      await fetchClassesData();
+
+      if (!selectedClass || !classes.some(c => c.className === selectedClass)) {
+        if (importedClassNames.length > 0) {
+          setSelectedClass(importedClassNames[0]);
+        }
+      }
+
+      setIsImportModalOpen(false);
+      setDetectedImportClasses([]);
+
+      showToast(
+        language === 'ar'
+          ? `تم بنجاح استيراد ${totalStudentsImported} تلميذ (${importedClassNames.length} قسم: ${importedClassNames.join('، ')})`
+          : `Succès : ${totalStudentsImported} élèves importés (${importedClassNames.length} classe(s))`
+      );
+    } catch (err: any) {
+      console.error('Import error:', err);
+      showToast(err.message || (language === 'ar' ? 'حدث خطأ أثناء الاستيراد' : "Erreur d'importation"));
+    } finally {
+      setImportingInProgress(false);
+    }
+  };
+
+  // Confirm import of all checked classes
+  const handleConfirmImport = async () => {
+    const toImport = detectedImportClasses.filter(c => c.selected && c.className.trim());
+    if (toImport.length === 0) {
+      showToast(language === 'ar' ? 'يرجى تحديد قسم واحد على الأقل للاستيراد.' : 'Sélectionnez au moins une classe.');
+      return;
+    }
+    await saveImportedGroupsToDB(toImport);
+  };
+
+  // Immediate single class import
+  const handleImportSingleImmediately = async (item: DetectedImportClass) => {
+    await saveImportedGroupsToDB([item]);
   };
 
   // Direct Export: Physical Tests Results
@@ -273,6 +443,51 @@ export const ClassesScreen: React.FC<ClassesScreenProps> = ({
     }
   };
 
+  // Toggle student gender on double-click / double-tap
+  const lastGenderTapRef = React.useRef<{ [key: string]: number }>({});
+
+  const handleToggleStudentGender = async (studentNum: string) => {
+    if (!rosterClass) return;
+    try {
+      const newSexe = await toggleStudentGender(rosterClass, studentNum);
+      setRosterStudents(prev => prev.map(r => {
+        if (r.student.numeroEleve === studentNum) {
+          return {
+            ...r,
+            student: { ...r.student, sexe: newSexe }
+          };
+        }
+        return r;
+      }));
+      // Refresh class card stats
+      fetchClassesData();
+      const currentStudent = rosterStudents.find(r => r.student.numeroEleve === studentNum)?.student;
+      const sName = currentStudent?.nomEleve || studentNum;
+      const genderLabel = newSexe === 'M' ? (language === 'ar' ? 'ذكر' : 'Garçon') : (language === 'ar' ? 'أنثى' : 'Fille');
+      showToast(language === 'ar' ? `تم تغيير جنس ${sName} إلى ${genderLabel} بنجاح` : `Sexe de ${sName} changé en ${genderLabel}`);
+    } catch (err) {
+      console.error('Error toggling student gender:', err);
+    }
+  };
+
+  const handleGenderInteraction = (studentNum: string, isTouch = false) => {
+    const now = Date.now();
+    const lastTap = lastGenderTapRef.current[studentNum] || 0;
+    
+    if (isTouch) {
+      if (now - lastTap < 380) {
+        lastGenderTapRef.current[studentNum] = 0;
+        handleToggleStudentGender(studentNum);
+      } else {
+        lastGenderTapRef.current[studentNum] = now;
+      }
+    } else {
+      if (now - lastTap < 400) return;
+      lastGenderTapRef.current[studentNum] = now;
+      handleToggleStudentGender(studentNum);
+    }
+  };
+
   // Delete class action
   const handleConfirmDelete = async () => {
     if (!classToDelete) return;
@@ -340,6 +555,26 @@ export const ClassesScreen: React.FC<ClassesScreenProps> = ({
     );
   }, [rosterStudents, rosterSearch]);
 
+  // Memoized values for import selection modal
+  const filteredDetectedClasses = useMemo(() => {
+    if (!importFilterQuery.trim()) return detectedImportClasses;
+    const q = importFilterQuery.toLowerCase();
+    return detectedImportClasses.filter(c => 
+      c.className.toLowerCase().includes(q) || 
+      c.originalClassName.toLowerCase().includes(q)
+    );
+  }, [detectedImportClasses, importFilterQuery]);
+
+  const selectedImportCount = useMemo(() => {
+    return detectedImportClasses.filter(c => c.selected).length;
+  }, [detectedImportClasses]);
+
+  const totalStudentsSelected = useMemo(() => {
+    return detectedImportClasses
+      .filter(c => c.selected)
+      .reduce((sum, c) => sum + c.students.length, 0);
+  }, [detectedImportClasses]);
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 animate-fadeIn">
       {/* Toast Notification */}
@@ -377,11 +612,21 @@ export const ClassesScreen: React.FC<ClassesScreenProps> = ({
             className="hidden"
           />
 
-          {/* Import Classes (استيراد الأقسام) button */}
+          {/* Add Student Manually button */}
           <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/20 transition"
-            title={language === 'ar' ? 'استيراد قسم أو عدة أقسام من ملفات Excel دفعة واحدة' : 'Importer une ou plusieurs classes'}
+            onClick={() => handleOpenAddStudent()}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-black shadow-md shadow-emerald-600/20 transition cursor-pointer"
+            title={language === 'ar' ? 'إضافة تلميذ يدوياً إلى القسم الحالي أو قسم جديد' : 'Ajouter un élève manuellement'}
+          >
+            <UserPlusIcon className="w-4 h-4" />
+            <span>{language === 'ar' ? 'إضافة تلميذ يدوياً' : 'Ajouter un élève'}</span>
+          </button>
+
+          {/* Import Classes (استيراد الأقسام) button with list type selector */}
+          <button
+            onClick={() => setIsTypeSelectorOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/20 transition cursor-pointer"
+            title={language === 'ar' ? 'اختيار نوع اللائحة (مسار / طارل) واستيراد الأقسام' : 'Importer des classes (Massar / TaRL)'}
           >
             <ArrowUpTrayIcon />
             <span>{language === 'ar' ? 'استيراد الأقسام' : 'استيراد الأقسام (Excel)'}</span>
@@ -389,19 +634,19 @@ export const ClassesScreen: React.FC<ClassesScreenProps> = ({
 
           {/* Download Template button */}
           <button
-            onClick={() => downloadStudentsTemplate(selectedClass)}
-            title={language === 'ar' ? 'تحميل نموذج Excel فارغ' : 'Télécharger modèle Excel'}
+            onClick={() => setIsTypeSelectorOpen(true)}
+            title={language === 'ar' ? 'تحميل نماذج Excel فارغة (مسار / طارل)' : 'Télécharger modèles Excel'}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 text-xs sm:text-sm font-bold transition"
           >
             <ExcelIcon className="w-4 h-4 text-emerald-600" />
-            <span className="hidden sm:inline">{language === 'ar' ? 'نموذج فارغ' : 'Modèle'}</span>
+            <span className="hidden sm:inline">{language === 'ar' ? 'النماذج الفارغة' : 'Modèles'}</span>
           </button>
 
           {/* Refresh Classes button */}
           <button
             onClick={fetchClassesData}
             title={language === 'ar' ? 'تحديث الإحصائيات' : 'Actualiser'}
-            className="p-2 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+            className="p-2 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition cursor-pointer"
           >
             <ArrowPathIcon />
           </button>
@@ -708,7 +953,7 @@ export const ClassesScreen: React.FC<ClassesScreenProps> = ({
                 </div>
 
                 {/* Card Bottom: Quick Actions */}
-                <div className="p-3 bg-gray-50/70 dark:bg-gray-800/60 rounded-b-2xl flex items-center justify-between gap-1.5">
+                <div className="p-3 bg-gray-50/70 dark:bg-gray-800/60 rounded-b-2xl flex items-center justify-between gap-1.5 flex-wrap">
                   {/* View Roster Modal */}
                   <button
                     onClick={() => handleOpenRoster(item.className)}
@@ -716,6 +961,16 @@ export const ClassesScreen: React.FC<ClassesScreenProps> = ({
                   >
                     <EyeIcon className="w-3.5 h-3.5 text-indigo-500" />
                     <span>{language === 'ar' ? 'معاينة التلاميذ' : 'Voir élèves'}</span>
+                  </button>
+
+                  {/* Add Student to this class directly */}
+                  <button
+                    onClick={() => handleOpenAddStudent(item.className)}
+                    title={language === 'ar' ? `إضافة تلميذ يدوياً إلى ${item.className}` : `Ajouter élève à ${item.className}`}
+                    className="flex items-center justify-center gap-1 py-2 px-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-bold hover:bg-emerald-100 transition shadow-xs"
+                  >
+                    <UserPlusIcon className="w-3.5 h-3.5" />
+                    <span>{language === 'ar' ? '+ تلميذ' : '+ Élève'}</span>
                   </button>
 
                   {/* Jump to Physical Tests & VMA */}
@@ -772,6 +1027,16 @@ export const ClassesScreen: React.FC<ClassesScreenProps> = ({
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
+                {/* Add student to this class button inside roster */}
+                <button
+                  onClick={() => handleOpenAddStudent(rosterClass)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-xs transition cursor-pointer"
+                  title={language === 'ar' ? 'إضافة تلميذ يدوياً لهذا القسم' : 'Ajouter un élève à cette classe'}
+                >
+                  <UserPlusIcon className="w-3.5 h-3.5" />
+                  <span>{language === 'ar' ? '+ إضافة تلميذ' : '+ Ajouter élève'}</span>
+                </button>
+
                 <button
                   onClick={() => handleExportPhysical(rosterClass)}
                   title={language === 'ar' ? 'تصدير نتائج الاختبارات البدنية لهذا القسم (Excel)' : 'Exporter tests physiques'}
@@ -819,7 +1084,7 @@ export const ClassesScreen: React.FC<ClassesScreenProps> = ({
                   type="text"
                   value={rosterSearch}
                   onChange={(e) => setRosterSearch(e.target.value)}
-                  placeholder={language === 'ar' ? 'بحث بالاسم...' : 'Rechercher un élève...'}
+                  placeholder={language === 'ar' ? 'بحث بالاسم أو رقم مسار...' : 'Rechercher un élève...'}
                   className="w-full ps-9 pe-3 py-2 text-xs sm:text-sm rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
@@ -833,8 +1098,15 @@ export const ClassesScreen: React.FC<ClassesScreenProps> = ({
                   <p className="text-xs text-gray-500">{language === 'ar' ? 'جاري التحميل...' : 'Chargement...'}</p>
                 </div>
               ) : filteredRoster.length === 0 ? (
-                <div className="py-12 text-center text-gray-400 text-xs sm:text-sm">
-                  {language === 'ar' ? 'لا يوجد تلاميذ يطابقون البحث.' : 'Aucun élève trouvé.'}
+                <div className="py-12 text-center text-gray-400 text-xs sm:text-sm space-y-3">
+                  <p>{language === 'ar' ? 'لا يوجد تلاميذ مسجلون في هذا القسم حالياً أو يطابقون البحث.' : 'Aucun élève trouvé.'}</p>
+                  <button
+                    onClick={() => handleOpenAddStudent(rosterClass)}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition"
+                  >
+                    <UserPlusIcon className="w-4 h-4" />
+                    <span>{language === 'ar' ? 'إضافة تلميذ الآن' : 'Ajouter un élève'}</span>
+                  </button>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -847,6 +1119,7 @@ export const ClassesScreen: React.FC<ClassesScreenProps> = ({
                         <th className="py-2.5 px-3 text-center">{t.navPhysicalTests}</th>
                         <th className="py-2.5 px-3 text-center">{t.vmaTitle}</th>
                         <th className="py-2.5 px-3 text-center">{t.navMeasurements}</th>
+                        <th className="py-2.5 px-3 text-center">{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -863,14 +1136,31 @@ export const ClassesScreen: React.FC<ClassesScreenProps> = ({
                               <span className="group-hover/rosterName:underline">{row.student.nomEleve}</span>
                               <PencilSquareIcon className="w-3.5 h-3.5 text-indigo-500 opacity-40 group-hover/rosterName:opacity-100 transition-opacity" />
                             </button>
+                            {row.student.numeroEleve && (
+                              <div className="text-[10px] font-mono text-gray-400 font-normal">
+                                {row.student.numeroEleve}
+                              </div>
+                            )}
                           </td>
-                          <td className="py-2 px-3 text-center">
-                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-black ${
+                          <td 
+                            className="py-2 px-3 text-center cursor-pointer select-none"
+                            title={language === 'ar' ? 'انقر مرتين لتغيير الجنس بين ذكر وأنثى' : 'Double-cliquez pour changer le sexe (M ↔ F)'}
+                            onDoubleClick={(e) => {
+                              e.stopPropagation();
+                              handleGenderInteraction(row.student.numeroEleve, false);
+                            }}
+                            onTouchEnd={(e) => {
+                              e.stopPropagation();
+                              handleGenderInteraction(row.student.numeroEleve, true);
+                            }}
+                          >
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black transition-all duration-150 hover:scale-110 active:scale-95 shadow-2xs border ${
                               row.student.sexe === 'M'
-                                ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
-                                : 'bg-pink-50 text-pink-700 dark:bg-pink-950 dark:text-pink-300'
+                                ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border-blue-200 dark:border-blue-800 hover:bg-blue-100'
+                                : 'bg-pink-50 text-pink-700 dark:bg-pink-950 dark:text-pink-300 border-pink-200 dark:border-pink-800 hover:bg-pink-100'
                             }`}>
-                              {row.student.sexe === 'M' ? (language === 'ar' ? 'ذكر' : 'G') : (language === 'ar' ? 'أنثى' : 'F')}
+                              <span>{row.student.sexe === 'M' ? (language === 'ar' ? 'ذكر' : 'G') : (language === 'ar' ? 'أنثى' : 'F')}</span>
+                              <span className="text-[9px] opacity-40">⇄</span>
                             </span>
                           </td>
                           <td className="py-2 px-3 text-center">
@@ -903,6 +1193,31 @@ export const ClassesScreen: React.FC<ClassesScreenProps> = ({
                               <span className="text-gray-400 text-[10px]">-</span>
                             )}
                           </td>
+                          {/* Actions: Edit Data & Delete Student */}
+                          <td className="py-2 px-3 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setModalStudentNumber(row.student.numeroEleve)}
+                                title={language === 'ar' ? 'تعديل بيانات التلميذ' : 'Modifier'}
+                                className="p-1.5 rounded-lg text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition"
+                              >
+                                <PencilSquareIcon className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setStudentToDelete({
+                                  className: rosterClass,
+                                  numeroEleve: row.student.numeroEleve,
+                                  nomEleve: row.student.nomEleve
+                                })}
+                                title={language === 'ar' ? 'حذف التلميذ من هذا القسم' : 'Supprimer élève'}
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition"
+                              >
+                                <TrashIcon />
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -923,6 +1238,230 @@ export const ClassesScreen: React.FC<ClassesScreenProps> = ({
                 {t.cancel}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Multi-Class & Single-Class Import Selector */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/65 backdrop-blur-xs overflow-y-auto animate-fadeIn">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl border border-gray-100 dark:border-gray-700 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
+            
+            {/* Modal Header */}
+            <div className="px-5 py-4 bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700 text-white flex items-center justify-between shrink-0 shadow-md">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-white/10 rounded-2xl backdrop-blur-md">
+                  <ExcelIcon className="w-6 h-6 text-emerald-300" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-black flex items-center gap-2">
+                    <span>{language === 'ar' ? 'استيراد واختيار الأقسام من Excel' : 'Sélection et importation des classes'}</span>
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/80 text-white font-bold">
+                      {detectedImportClasses.length} {language === 'ar' ? 'أقسام مكتشفة' : 'classes'}
+                    </span>
+                  </h2>
+                  <p className="text-xs text-indigo-100 font-medium">
+                    {language === 'ar' 
+                      ? 'يمكنك استيراد جميع الأقسام دفعة واحدة، أو تحديد مجموعة أقسام معينة، أو استيراد قسم واحد فقط.' 
+                      : 'Importez toutes les classes en bloc, sélectionnez un groupe, ou importez une seule classe.'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  setIsImportModalOpen(false);
+                  setDetectedImportClasses([]);
+                }}
+                disabled={importingInProgress}
+                className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition cursor-pointer"
+              >
+                <XMarkIcon className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Modal Controls Toolbar */}
+            <div className="p-4 bg-gray-50 dark:bg-gray-700/40 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center justify-between gap-3">
+              {/* Select All / Deselect All Buttons */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => handleSelectAllImport(true)}
+                  disabled={importingInProgress}
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl bg-indigo-100 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 transition cursor-pointer flex items-center gap-1.5"
+                >
+                  <CheckIcon />
+                  <span>{language === 'ar' ? 'تحديد الكل (استيراد جماعي)' : 'Tout sélectionner'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleSelectAllImport(false)}
+                  disabled={importingInProgress}
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl bg-gray-200/80 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 transition cursor-pointer"
+                >
+                  <span>{language === 'ar' ? 'إلغاء تحديد الكل' : 'Tout désélectionner'}</span>
+                </button>
+
+                {/* Quick Single Class Dropdown Helper */}
+                {detectedImportClasses.length > 1 && (
+                  <div className="flex items-center gap-1.5 ms-2">
+                    <span className="text-xs font-bold text-gray-500 dark:text-gray-400">
+                      {language === 'ar' ? 'تحديد قسم واحد فقط:' : 'Choisir une seule :'}
+                    </span>
+                    <select
+                      onChange={(e) => {
+                        if (e.target.value) handleSelectSingleClass(e.target.value);
+                      }}
+                      defaultValue=""
+                      className="px-2.5 py-1 text-xs font-bold rounded-xl border border-gray-300 dark:bg-gray-800 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 text-gray-800 dark:text-gray-200 cursor-pointer"
+                    >
+                      <option value="" disabled>{language === 'ar' ? '-- اختر قسماً --' : '-- Choisir --'}</option>
+                      {detectedImportClasses.map(c => (
+                        <option key={c.id} value={c.id}>{c.className} ({c.students.length} تلميذ)</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Filter Search */}
+              <div className="relative w-full sm:w-56">
+                <input
+                  type="text"
+                  placeholder={language === 'ar' ? 'بحث في الأقسام المكتشفة...' : 'Filtrer les classes...'}
+                  value={importFilterQuery}
+                  onChange={(e) => setImportFilterQuery(e.target.value)}
+                  className="w-full px-3 py-1.5 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+
+            {/* Classes Cards List */}
+            <div className="p-4 sm:p-5 overflow-y-auto space-y-3 flex-grow custom-scrollbar">
+              {filteredDetectedClasses.length === 0 ? (
+                <div className="py-12 text-center text-xs text-gray-500 dark:text-gray-400">
+                  {language === 'ar' ? 'لا توجد نتائج تطابق بحثك.' : 'Aucun résultat trouvé.'}
+                </div>
+              ) : (
+                filteredDetectedClasses.map(item => {
+                  const sampleNames = item.students.slice(0, 3).map(s => s.nomEleve).join('، ');
+                  const hasMore = item.students.length > 3;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className={`p-3.5 sm:p-4 rounded-2xl border-2 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                        item.selected
+                          ? 'bg-indigo-50/40 dark:bg-indigo-950/20 border-indigo-500 shadow-sm ring-1 ring-indigo-500/20'
+                          : 'bg-white dark:bg-gray-800/80 border-gray-200 dark:border-gray-700 opacity-70 hover:opacity-100'
+                      }`}
+                    >
+                      {/* Checkbox & Class Info */}
+                      <div className="flex items-start sm:items-center gap-3 flex-grow min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={item.selected}
+                          onChange={() => handleToggleClassSelect(item.id)}
+                          className="w-5 h-5 rounded-lg text-indigo-600 border-gray-300 dark:border-gray-600 focus:ring-indigo-500 cursor-pointer mt-1 sm:mt-0 shrink-0"
+                        />
+
+                        <div className="space-y-1 min-w-0 flex-grow">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {/* Editable Class Name */}
+                            <div className="flex items-center gap-1.5">
+                              <label className="text-[11px] font-bold text-gray-400 shrink-0">{language === 'ar' ? 'اسم القسم:' : 'Classe:'}</label>
+                              <input
+                                type="text"
+                                value={item.className}
+                                onChange={(e) => handleUpdateClassName(item.id, e.target.value)}
+                                className="px-2.5 py-1 text-xs font-black rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 max-w-[160px]"
+                              />
+                            </div>
+
+                            {/* Badges */}
+                            <span className="px-2.5 py-0.5 rounded-lg text-xs font-black bg-indigo-100 dark:bg-indigo-900/60 text-indigo-800 dark:text-indigo-200">
+                              {item.students.length} {language === 'ar' ? 'تلميذ' : 'élèves'}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-lg text-[11px] font-bold bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+                              {item.boysCount} 👦 {language === 'ar' ? 'ذكور' : 'garçons'}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-lg text-[11px] font-bold bg-pink-100 dark:bg-pink-950 text-pink-700 dark:text-pink-300">
+                              {item.girlsCount} 👧 {language === 'ar' ? 'إناث' : 'filles'}
+                            </span>
+                          </div>
+
+                          {/* Sample names preview */}
+                          <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                            <span className="font-semibold">{language === 'ar' ? 'عينة من الأسماء:' : 'Aperçu:'} </span>
+                            <span>{sampleNames}{hasMore ? ` ... (+${item.students.length - 3})` : ''}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Single Class Quick Action Button */}
+                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                        <button
+                          type="button"
+                          onClick={() => handleImportSingleImmediately(item)}
+                          disabled={importingInProgress}
+                          className="px-3 py-1.5 text-xs font-bold rounded-xl border border-indigo-300 dark:border-indigo-700 bg-white dark:bg-gray-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition cursor-pointer whitespace-nowrap shadow-2xs"
+                          title="استيراد هذا القسم بمفرده فوراً"
+                        >
+                          ⚡ {language === 'ar' ? 'استيراد هذا القسم فقط' : 'Importer seule'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                {language === 'ar' ? (
+                  <span>
+                    تم تحديد <span className="text-indigo-600 dark:text-indigo-400 font-black">{selectedImportCount}</span> من أصل <span className="font-black">{detectedImportClasses.length}</span> قسم (إجمالي <span className="text-emerald-600 dark:text-emerald-400 font-black">{totalStudentsSelected}</span> تلميذ)
+                  </span>
+                ) : (
+                  <span>
+                    {selectedImportCount} sur {detectedImportClasses.length} classe(s) sélectionnée(s) ({totalStudentsSelected} élèves au total)
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsImportModalOpen(false);
+                    setDetectedImportClasses([]);
+                  }}
+                  disabled={importingInProgress}
+                  className="px-4 py-2 text-xs font-bold rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 transition cursor-pointer"
+                >
+                  {t.cancel}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleConfirmImport}
+                  disabled={importingInProgress || selectedImportCount === 0}
+                  className="px-5 py-2 text-xs font-black rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white shadow-md shadow-indigo-600/20 transition flex items-center gap-2 cursor-pointer"
+                >
+                  {importingInProgress && (
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  )}
+                  <span>
+                    {language === 'ar'
+                      ? `تأكيد استيراد وحفظ الأقسام المحددة (${selectedImportCount})`
+                      : `Confirmer l'importation (${selectedImportCount})`}
+                  </span>
+                </button>
+              </div>
+            </div>
+
           </div>
         </div>
       )}
@@ -964,6 +1503,61 @@ export const ClassesScreen: React.FC<ClassesScreenProps> = ({
           </div>
         </div>
       )}
+
+      {/* MODAL: Delete Single Student Confirmation */}
+      {studentToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-2xl p-6 shadow-2xl border border-gray-200 dark:border-gray-700 space-y-4 animate-fadeIn">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950">
+                <TrashIcon />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                {language === 'ar' ? 'تأكيد حذف التلميذ' : 'Confirmer la suppression'}
+              </h3>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+              {language === 'ar'
+                ? `هل أنت متأكد من رغبتك في حذف التلميذ "${studentToDelete.nomEleve}" من القسم "${studentToDelete.className}"؟`
+                : `Êtes-vous sûr de vouloir supprimer l'élève "${studentToDelete.nomEleve}" de la classe "${studentToDelete.className}" ?`}
+            </p>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => setStudentToDelete(null)}
+                disabled={deletingStudent}
+                className="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-xs font-bold hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+              >
+                {t.cancel}
+              </button>
+              <button
+                onClick={handleConfirmDeleteStudent}
+                disabled={deletingStudent}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-600/20 transition flex items-center gap-2"
+              >
+                {deletingStudent && <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                <span>{language === 'ar' ? 'نعم، حذف التلميذ' : 'Supprimer'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Add Student Manually */}
+      <AddStudentModal
+        isOpen={isAddStudentOpen}
+        onClose={() => setIsAddStudentOpen(false)}
+        defaultClassName={addStudentDefaultClass}
+        classList={classes.map(c => c.className)}
+        onStudentAdded={handleStudentAddedSuccessfully}
+      />
+
+      {/* MODAL: Import Type Selector (Massar vs TaRL) */}
+      <ImportTypeSelectorModal
+        isOpen={isTypeSelectorOpen}
+        onClose={() => setIsTypeSelectorOpen(false)}
+        onSelectType={handleStartImportWithType}
+        selectedClass={selectedClass || (classes[0]?.className || '3ème 1')}
+      />
 
       {modalStudentNumber && rosterClass && (
         <StudentDataModal
