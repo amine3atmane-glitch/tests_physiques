@@ -52,9 +52,13 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
     { laneIndex: 3, studentNumber: '', isFinished: false },
   ]);
 
-  // Search/Filter state per lane for student assignment
-  const [laneSearchQuery, setLaneSearchQuery] = useState<Record<number, string>>({});
-  const [quickNumberInput, setQuickNumberInput] = useState<Record<number, string>>({});
+  // Selected target lane for student assignment from the big list below
+  const [targetLane, setTargetLane] = useState<number>(1);
+
+  // Search & Filter state for the large student list below the lanes
+  const [studentSearch, setStudentSearch] = useState<string>('');
+  const [studentFilter, setStudentFilter] = useState<'all' | 'untested' | 'tested' | 'M' | 'F'>('all');
+  const [quickNumberInput, setQuickNumberInput] = useState<string>('');
 
   // Active view tab: 'race' or 'untested'
   const [bottomTab, setBottomTab] = useState<'results' | 'untested'>('results');
@@ -236,8 +240,7 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
       isFinished: false,
       studentNumber: ''
     })));
-    setLaneSearchQuery({});
-    setQuickNumberInput({});
+    setQuickNumberInput('');
   };
 
   // Prepare next run (clears times & assigned students for new runners)
@@ -251,8 +254,8 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
       isFinished: false,
       studentNumber: ''
     })));
-    setLaneSearchQuery({});
-    setQuickNumberInput({});
+    setQuickNumberInput('');
+    setTargetLane(1);
   };
 
   // Record finish time for a lane when touched/clicked (supports Multi-touch Ex æquo)
@@ -280,6 +283,11 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
         r.laneIndex === laneIndex ? { ...r, recordedTime: timeInSec, isFinished: true } : r
       );
       setRunners(nextRunners);
+
+      // If lane does not have a student yet, set targetLane to this finished lane
+      if (!runner.studentNumber) {
+        setTargetLane(laneIndex);
+      }
 
       // If student is already assigned, save immediately
       if (runner.studentNumber) {
@@ -321,7 +329,7 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
   // Assign a student to a finished lane AFTER the race
   const handleAssignStudent = async (laneIndex: number, studentNumber: string) => {
     const runner = runners.find(r => r.laneIndex === laneIndex);
-    if (!runner || runner.recordedTime === undefined) return;
+    if (!runner) return;
 
     // Check if this student is already selected in another lane
     const alreadyInOtherLane = runners.some(r => r.laneIndex !== laneIndex && r.studentNumber === studentNumber);
@@ -330,17 +338,27 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
       return;
     }
 
-    setRunners(prev => prev.map(r => 
+    const updatedRunners = runners.map(r => 
       r.laneIndex === laneIndex ? { ...r, studentNumber } : r
-    ));
+    );
+    setRunners(updatedRunners);
 
-    // Clear search input for this lane
-    setLaneSearchQuery(prev => ({ ...prev, [laneIndex]: '' }));
-    setQuickNumberInput(prev => ({ ...prev, [laneIndex]: '' }));
-
-    // Save directly to IndexedDB
-    await saveStudent30mTime(studentNumber, runner.recordedTime);
+    // Save directly to IndexedDB if time is recorded
+    if (runner.recordedTime !== undefined) {
+      await saveStudent30mTime(studentNumber, runner.recordedTime);
+    }
     playBeep(880, 0.1, 'sine');
+
+    // Auto switch targetLane to the next unassigned finished lane or next lane
+    const nextUnassigned = updatedRunners.find(r => r.isFinished && !r.studentNumber);
+    if (nextUnassigned) {
+      setTargetLane(nextUnassigned.laneIndex);
+    } else {
+      const anyEmpty = updatedRunners.find(r => !r.studentNumber);
+      if (anyEmpty) {
+        setTargetLane(anyEmpty.laneIndex);
+      }
+    }
   };
 
   // Remove/change assigned student for a lane
@@ -348,11 +366,12 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
     setRunners(prev => prev.map(r => 
       r.laneIndex === laneIndex ? { ...r, studentNumber: '' } : r
     ));
+    setTargetLane(laneIndex);
   };
 
   // Handle quick number entry submit (e.g. typing "7" and pressing Enter)
-  const handleQuickNumberSubmit = (laneIndex: number) => {
-    const query = (quickNumberInput[laneIndex] || '').trim();
+  const handleQuickNumberSubmit = () => {
+    const query = quickNumberInput.trim();
     if (!query) return;
 
     // Find student by orderIndex or numeroEleve
@@ -363,11 +382,37 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
     );
 
     if (match) {
-      handleAssignStudent(laneIndex, match.numeroEleve);
+      handleAssignStudent(targetLane, match.numeroEleve);
+      setQuickNumberInput('');
     } else {
       alert(`لم يتم العثور على تلميذ بالرقم أو الاسم: "${query}"`);
     }
   };
+
+  // Filtered students for the large selection roster underneath the lanes
+  const filteredStudentsForSelection = useMemo(() => {
+    return students.filter(s => {
+      // Filter by search query (orderIndex, numeroEleve, nomEleve)
+      if (studentSearch) {
+        const query = studentSearch.toLowerCase().trim();
+        const orderMatch = s.orderIndex && String(s.orderIndex).includes(query);
+        const numMatch = s.numeroEleve.toLowerCase().includes(query);
+        const nameMatch = s.nomEleve.toLowerCase().includes(query);
+        if (!orderMatch && !numMatch && !nameMatch) return false;
+      }
+
+      // Filter by status/tab
+      const prevRes = physicalResults.find(r => r.numeroEleve === s.numeroEleve);
+      const hasTested = prevRes?.vitesse30m !== undefined && prevRes.vitesse30m > 0;
+
+      if (studentFilter === 'untested' && hasTested) return false;
+      if (studentFilter === 'tested' && !hasTested) return false;
+      if (studentFilter === 'M' && s.sexe !== 'M') return false;
+      if (studentFilter === 'F' && s.sexe !== 'F') return false;
+
+      return true;
+    });
+  }, [students, studentSearch, studentFilter, physicalResults]);
 
   // Auto assign the next untested students in sequential order (optional helper)
   const autoAssignNextUntested = () => {
@@ -649,12 +694,12 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
             </div>
           </div>
 
-          {/* ACTIVE LANES GRID: TOUCH TO RECORD TIME + POST-RACE STUDENT REGISTRATION */}
-          <div className="space-y-2.5 sm:space-y-4">
+          {/* ACTIVE LANES GRID: TOUCH TO RECORD TIME */}
+          <div className="space-y-2.5 sm:space-y-3">
             <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-gray-200 dark:border-gray-700">
               <h3 className="text-xs sm:text-sm font-extrabold text-gray-900 dark:text-white flex items-center gap-1.5">
                 <UserGroupIcon className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600" />
-                <span>ممرات السباق ({runners.length}):</span>
+                <span>ممرات السباق ({runners.length} ممرات):</span>
               </h3>
 
               <div className="flex items-center gap-1.5">
@@ -664,49 +709,57 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
               </div>
             </div>
 
-            {/* Lanes Grid - Always Side-by-Side (جنباً إلى جنب) */}
+            {/* Lanes Grid - Side-by-Side */}
             <div className="w-full overflow-x-auto pb-1 custom-scrollbar">
               <div 
-                className={`grid gap-1.5 sm:gap-3 ${
+                className={`grid gap-2 sm:gap-3 ${
                   runners.length === 1 
                     ? 'grid-cols-1 max-w-xs mx-auto' 
                     : runners.length === 2 
                       ? 'grid-cols-2' 
                       : runners.length === 3 
                         ? 'grid-cols-3 min-w-[340px] sm:min-w-0' 
-                        : 'grid-cols-4 min-w-[420px] sm:min-w-0'
+                        : 'grid-cols-4 min-w-[440px] sm:min-w-0'
                 }`}
               >
                 {runners.map(runner => {
                   const assignedStudent = students.find(s => s.numeroEleve === runner.studentNumber);
                   const isExAequo = runner.isFinished && runner.recordedTime !== undefined &&
                     runners.some(r => r.laneIndex !== runner.laneIndex && r.isFinished && r.recordedTime === runner.recordedTime);
-
-                  const searchQuery = (laneSearchQuery[runner.laneIndex] || '').toLowerCase();
-                  const filteredStudents = students.filter(s => {
-                    if (!searchQuery) return true;
-                    const orderMatch = s.orderIndex && String(s.orderIndex).includes(searchQuery);
-                    const numMatch = s.numeroEleve.includes(searchQuery);
-                    const nameMatch = s.nomEleve.toLowerCase().includes(searchQuery);
-                    return orderMatch || numMatch || nameMatch;
-                  });
+                  const isTarget = targetLane === runner.laneIndex;
 
                   return (
                     <div
                       key={runner.laneIndex}
-                      className={`flex flex-col justify-between p-2 sm:p-3 rounded-2xl sm:rounded-3xl border-2 transition-all shadow-sm ${
+                      onClick={() => setTargetLane(runner.laneIndex)}
+                      className={`flex flex-col justify-between p-2.5 sm:p-3 rounded-2xl border-2 transition-all shadow-sm cursor-pointer ${
+                        isTarget
+                          ? 'ring-2 ring-amber-500 shadow-md'
+                          : ''
+                      } ${
                         runner.isFinished
-                          ? 'bg-white dark:bg-gray-800 border-emerald-500 dark:border-emerald-500 ring-2 ring-emerald-500/20'
+                          ? 'bg-white dark:bg-gray-800 border-emerald-500 dark:border-emerald-500'
                           : testState === 'running'
                           ? 'bg-amber-500/10 border-amber-500 animate-pulse'
                           : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
                       }`}
                     >
                       {/* Lane Header Bar */}
-                      <div className="flex items-center justify-between pb-1 mb-1 border-b border-gray-100 dark:border-gray-700">
-                        <span className="text-[10px] sm:text-xs font-black px-1.5 sm:px-2 py-0.5 rounded-lg bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300">
-                          ممر {runner.laneIndex}
-                        </span>
+                      <div className="flex items-center justify-between pb-1 mb-1.5 border-b border-gray-100 dark:border-gray-700">
+                        <div className="flex items-center gap-1">
+                          <span className={`text-[10px] sm:text-xs font-black px-2 py-0.5 rounded-lg ${
+                            isTarget 
+                              ? 'bg-amber-500 text-white shadow-xs' 
+                              : 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
+                          }`}>
+                            الممر #{runner.laneIndex}
+                          </span>
+                          {isTarget && (
+                            <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400">
+                              (النشط)
+                            </span>
+                          )}
+                        </div>
 
                         {isExAequo && (
                           <span className="px-1 py-0.5 rounded text-[8px] sm:text-[9px] font-extrabold bg-amber-400 text-gray-900">
@@ -716,7 +769,10 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
 
                         {runner.isFinished && (
                           <button
-                            onClick={() => handleCancelLaneTime(runner.laneIndex)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCancelLaneTime(runner.laneIndex);
+                            }}
                             title="إلغاء هذا التوقيت"
                             className="text-[10px] text-gray-400 hover:text-red-500 transition cursor-pointer"
                           >
@@ -729,9 +785,12 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
                       {!runner.isFinished ? (
                         <button
                           onTouchStart={(e) => handleLaneTouchStart(e, runner.laneIndex)}
-                          onClick={() => handleLaneClick(runner.laneIndex)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleLaneClick(runner.laneIndex);
+                          }}
                           disabled={testState === 'idle'}
-                          className={`w-full py-5 sm:py-7 px-1 rounded-xl sm:rounded-2xl flex flex-col items-center justify-center text-center transition-all transform active:scale-95 cursor-pointer touch-manipulation select-none border-2 border-dashed ${
+                          className={`w-full py-5 sm:py-7 px-1 rounded-xl flex flex-col items-center justify-center text-center transition-all transform active:scale-95 cursor-pointer touch-manipulation select-none border-2 border-dashed ${
                             testState === 'running'
                               ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-400 shadow-md shadow-amber-500/30'
                               : 'bg-gray-100 dark:bg-gray-700/50 text-gray-400 border-gray-300 dark:border-gray-600'
@@ -747,9 +806,9 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
                         </button>
                       ) : (
                         /* FINISHED TIME DISPLAY */
-                        <div className="p-1.5 sm:p-2 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl sm:rounded-2xl border border-emerald-300 dark:border-emerald-800 text-center mb-1.5">
+                        <div className="p-1.5 sm:p-2 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-300 dark:border-emerald-800 text-center mb-1.5">
                           <div className="text-[9px] sm:text-[10px] font-bold text-emerald-700 dark:text-emerald-300 uppercase">
-                            الممر #{runner.laneIndex}
+                            التوقيت المسجل
                           </div>
                           <div className="text-xl sm:text-2xl font-mono font-black text-emerald-800 dark:text-emerald-200 tracking-tight my-0.5">
                             {runner.recordedTime?.toFixed(2)}
@@ -760,142 +819,66 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
                         </div>
                       )}
 
-                      {/* POST-TEST STUDENT IDENTIFICATION (RECORD NAME / NUMBER AFTER TEST) */}
-                      {runner.isFinished && (
-                        <div className="mt-1 pt-1 border-t border-gray-200 dark:border-gray-700">
-                          {assignedStudent ? (
-                            /* ALREADY ASSIGNED STUDENT VIEW */
-                            <div className="p-1.5 sm:p-2 bg-gray-50 dark:bg-gray-700/60 rounded-xl border border-emerald-400/50 flex flex-col gap-1">
-                              <div className="flex items-center justify-between">
-                                <span className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
-                                  <CheckIcon className="w-3 h-3 text-emerald-500" />
-                                  <span>تم الربط:</span>
-                                </span>
-                                <button
-                                  onClick={() => handleUnassignStudent(runner.laneIndex)}
-                                  className="text-[9px] sm:text-[10px] font-bold text-amber-600 hover:text-amber-700 dark:text-amber-400 flex items-center gap-0.5 cursor-pointer"
-                                >
-                                  <PencilSquareIcon className="w-2.5 h-2.5" />
-                                  <span>تغيير</span>
-                                </button>
-                              </div>
+                      {/* ASSIGNED STUDENT CARD IN LANE */}
+                      <div className="mt-1 pt-1.5 border-t border-gray-200 dark:border-gray-700">
+                        {assignedStudent ? (
+                          <div className="p-1.5 bg-gray-50 dark:bg-gray-700/60 rounded-xl border border-emerald-400/50 flex flex-col gap-1">
+                            <div className="flex items-center justify-between">
+                              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-700 dark:text-emerald-300">
+                                <CheckIcon className="w-3 h-3 text-emerald-500" />
+                                <span>تم الربط:</span>
+                              </span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUnassignStudent(runner.laneIndex);
+                                }}
+                                className="text-[9px] font-bold text-amber-600 hover:text-amber-700 dark:text-amber-400 flex items-center gap-0.5 cursor-pointer"
+                              >
+                                <PencilSquareIcon className="w-2.5 h-2.5" />
+                                <span>تغيير</span>
+                              </button>
+                            </div>
 
-                              <div className="flex items-center justify-between gap-1">
-                                <div className="truncate min-w-0">
-                                  <div className="text-[9px] font-mono font-bold text-gray-400">
-                                    #{assignedStudent.orderIndex || assignedStudent.numeroEleve}
-                                  </div>
-                                  <div className="text-[11px] sm:text-xs font-black text-gray-900 dark:text-white truncate">
-                                    {assignedStudent.nomEleve}
-                                  </div>
+                            <div className="flex items-center justify-between gap-1">
+                              <div className="truncate min-w-0">
+                                <div className="text-[10px] font-mono font-bold text-gray-400">
+                                  #{assignedStudent.orderIndex || (students.findIndex(s => s.numeroEleve === assignedStudent.numeroEleve) + 1)}
                                 </div>
-                                <span 
-                                  className={`inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[8px] sm:text-[9px] font-bold cursor-pointer select-none shrink-0 border ${assignedStudent.sexe === 'F' ? 'bg-pink-100 text-pink-700 border-pink-200' : 'bg-blue-100 text-blue-700 border-blue-200'}`}
-                                  title="انقر مرتين لتغيير الجنس"
-                                  onDoubleClick={(e) => {
-                                    e.stopPropagation();
-                                    handleGenderInteraction(assignedStudent.numeroEleve, false);
-                                  }}
-                                  onTouchEnd={(e) => {
-                                    e.stopPropagation();
-                                    handleGenderInteraction(assignedStudent.numeroEleve, true);
-                                  }}
-                                >
-                                  <span>{assignedStudent.sexe === 'F' ? 'أنثى' : 'ذكر'}</span>
-                                  <span className="text-[7px] opacity-40">⇄</span>
-                                </span>
+                                <div className="text-[11px] sm:text-xs font-black text-gray-900 dark:text-white truncate">
+                                  {assignedStudent.nomEleve}
+                                </div>
                               </div>
+                              <span 
+                                className={`inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[8px] font-bold cursor-pointer select-none shrink-0 border ${assignedStudent.sexe === 'F' ? 'bg-pink-100 text-pink-700 border-pink-200' : 'bg-blue-100 text-blue-700 border-blue-200'}`}
+                                title="انقر مرتين لتغيير الجنس"
+                                onDoubleClick={(e) => {
+                                  e.stopPropagation();
+                                  handleGenderInteraction(assignedStudent.numeroEleve, false);
+                                }}
+                                onTouchEnd={(e) => {
+                                  e.stopPropagation();
+                                  handleGenderInteraction(assignedStudent.numeroEleve, true);
+                                }}
+                              >
+                                <span>{assignedStudent.sexe === 'F' ? 'أنثى' : 'ذكر'}</span>
+                              </span>
                             </div>
-                          ) : (
-                            /* UNASSIGNED: ENTER OR SELECT STUDENT NAME / NUMBER */
-                            <div className="space-y-1">
-                              <div className="text-[9px] sm:text-[10px] font-black text-amber-700 dark:text-amber-400 flex items-center justify-between">
-                                <span>✍️ رقم التلميذ:</span>
-                              </div>
-
-                              {/* Option 1: Fast Number Quick-Entry Input */}
-                              <div className="flex gap-1">
-                                <input
-                                  type="text"
-                                  placeholder="رقم (#)"
-                                  value={quickNumberInput[runner.laneIndex] || ''}
-                                  onChange={(e) => setQuickNumberInput(prev => ({ ...prev, [runner.laneIndex]: e.target.value }))}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      handleQuickNumberSubmit(runner.laneIndex);
-                                    }
-                                  }}
-                                  className="w-full px-1.5 py-0.5 text-[11px] font-bold bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-1 focus:ring-amber-500 text-right"
-                                />
-                                <button
-                                  onClick={() => handleQuickNumberSubmit(runner.laneIndex)}
-                                  className="px-2 py-0.5 text-[10px] font-black bg-amber-600 hover:bg-amber-500 text-white rounded-lg shrink-0 cursor-pointer"
-                                >
-                                  حفظ
-                                </button>
-                              </div>
-
-                              {/* Option 2: Searchable Dropdown / Selector */}
-                              <div>
-                                <input
-                                  type="text"
-                                  placeholder="بحث بالاسم..."
-                                  value={laneSearchQuery[runner.laneIndex] || ''}
-                                  onChange={(e) => setLaneSearchQuery(prev => ({ ...prev, [runner.laneIndex]: e.target.value }))}
-                                  className="w-full px-1.5 py-0.5 text-[9px] bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md text-right"
-                                />
-                              </div>
-
-                              {/* Quick Scrollable Student List for 1-Tap Assignment */}
-                              <div className="max-h-24 sm:max-h-32 overflow-y-auto space-y-0.5 p-0.5 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200/80 dark:border-gray-700/80 custom-scrollbar">
-                                {filteredStudents.length === 0 ? (
-                                  <div className="text-[9px] text-gray-400 p-1 text-center">لا يوجد تلميذ</div>
-                                ) : (
-                                  filteredStudents.map(student => {
-                                    const prevRes = physicalResults.find(r => r.numeroEleve === student.numeroEleve);
-                                    const hasTested = prevRes?.vitesse30m !== undefined && prevRes.vitesse30m > 0;
-                                    const isSelectedInOtherLane = runners.some(r => r.laneIndex !== runner.laneIndex && r.studentNumber === student.numeroEleve);
-
-                                    return (
-                                      <button
-                                        key={student.numeroEleve}
-                                        disabled={isSelectedInOtherLane}
-                                        onClick={() => handleAssignStudent(runner.laneIndex, student.numeroEleve)}
-                                        className={`w-full flex items-center justify-between p-1 rounded text-right text-[10px] transition cursor-pointer ${
-                                          isSelectedInOtherLane
-                                            ? 'opacity-40 bg-gray-100 dark:bg-gray-800'
-                                            : 'hover:bg-amber-100 dark:hover:bg-amber-950/60 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700'
-                                        }`}
-                                      >
-                                        <div className="flex items-center gap-1 truncate min-w-0">
-                                          <span className="font-mono font-bold text-gray-400 text-[8px]">
-                                            #{student.orderIndex || student.numeroEleve}
-                                          </span>
-                                          <span className="font-bold text-gray-900 dark:text-gray-100 truncate text-[10px]">
-                                            {student.nomEleve}
-                                          </span>
-                                        </div>
-
-                                        <div className="flex items-center gap-1 shrink-0">
-                                          {!hasTested ? (
-                                            <span className="text-[7px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950 px-1 rounded">
-                                              -
-                                            </span>
-                                          ) : (
-                                            <span className="text-[7px] font-mono text-emerald-600 dark:text-emerald-400">
-                                              {prevRes.vitesse30m?.toFixed(2)}
-                                            </span>
-                                          )}
-                                        </div>
-                                      </button>
-                                    );
-                                  })
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                          </div>
+                        ) : (
+                          <div 
+                            className={`p-2 rounded-xl text-center border border-dashed transition ${
+                              isTarget
+                                ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-400 text-amber-800 dark:text-amber-300'
+                                : 'bg-gray-50 dark:bg-gray-800/40 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400'
+                            }`}
+                          >
+                            <span className="text-[10px] font-bold block">
+                              {isTarget ? '👇 اختر التلميذ من اللائحة أسفله' : '➕ اضغط لتحديد هذا الممر'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -903,8 +886,184 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
             </div>
           </div>
 
+          {/* LARGE STUDENT SELECTION ROSTER UNDERNEATH THE LANES (لائحة الأسماء والرقم الترتيبي فقط) */}
+          <div className="p-3 sm:p-4 bg-white dark:bg-gray-800 rounded-2xl sm:rounded-3xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-3">
+            
+            {/* Header: Title + Active Target Lane Status */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center font-black">
+                  <UserGroupIcon className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs sm:text-sm font-black text-gray-900 dark:text-white">
+                    لائحة التلاميذ ({filteredStudentsForSelection.length} تلميذ)
+                  </h3>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                    اضغط على اسم التلميذ لتعيينه مباشرة إلى <strong className="text-amber-600 dark:text-amber-400 font-black">الممر #{targetLane}</strong>
+                  </p>
+                </div>
+              </div>
+
+              {/* Target Lane Quick Selector */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[11px] font-bold text-gray-600 dark:text-gray-300">
+                  الممر المحدد:
+                </span>
+                {runners.map(r => (
+                  <button
+                    key={r.laneIndex}
+                    onClick={() => setTargetLane(r.laneIndex)}
+                    className={`px-3 py-1 text-xs font-black rounded-xl transition cursor-pointer flex items-center gap-1 border ${
+                      targetLane === r.laneIndex
+                        ? 'bg-amber-600 text-white border-amber-600 shadow-sm ring-2 ring-amber-400/30'
+                        : 'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    <span>ممر #{r.laneIndex}</span>
+                    {r.studentNumber && <span className="text-[9px] text-emerald-300">✓</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Search Box & Quick Filters */}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  placeholder="🔍 بحث بالاسم أو الرقم الترتيبي (#)..."
+                  value={studentSearch}
+                  onChange={(e) => setStudentSearch(e.target.value)}
+                  className="w-full pr-3 pl-8 py-2 text-xs font-bold bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-amber-500 text-right shadow-xs"
+                />
+                {studentSearch && (
+                  <button
+                    onClick={() => setStudentSearch('')}
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xs"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Filter Pills */}
+              <div className="flex items-center gap-1 overflow-x-auto pb-0.5 custom-scrollbar">
+                <button
+                  onClick={() => setStudentFilter('all')}
+                  className={`px-2.5 py-1.5 text-[11px] font-bold rounded-xl transition cursor-pointer shrink-0 ${
+                    studentFilter === 'all'
+                      ? 'bg-amber-600 text-white shadow-xs'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200'
+                  }`}
+                >
+                  الكل ({students.length})
+                </button>
+                <button
+                  onClick={() => setStudentFilter('untested')}
+                  className={`px-2.5 py-1.5 text-[11px] font-bold rounded-xl transition cursor-pointer shrink-0 ${
+                    studentFilter === 'untested'
+                      ? 'bg-amber-600 text-white shadow-xs'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200'
+                  }`}
+                >
+                  لم يجتز ({untestedStudents.length})
+                </button>
+                <button
+                  onClick={() => setStudentFilter('tested')}
+                  className={`px-2.5 py-1.5 text-[11px] font-bold rounded-xl transition cursor-pointer shrink-0 ${
+                    studentFilter === 'tested'
+                      ? 'bg-amber-600 text-white shadow-xs'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200'
+                  }`}
+                >
+                  اجتاز ({completedResults.length})
+                </button>
+              </div>
+            </div>
+
+            {/* Clear, Big Student Grid: Only Order # and Full Name */}
+            <div className="max-h-72 sm:max-h-96 overflow-y-auto p-1 bg-gray-50/50 dark:bg-gray-900/50 rounded-2xl border border-gray-200 dark:border-gray-700 custom-scrollbar">
+              {filteredStudentsForSelection.length === 0 ? (
+                <div className="p-8 text-center text-xs text-gray-400 dark:text-gray-500">
+                  لا يوجد تلميذ مطابق للبحث
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                  {filteredStudentsForSelection.map((student, idx) => {
+                    const prevRes = physicalResults.find(r => r.numeroEleve === student.numeroEleve);
+                    const hasTested = prevRes?.vitesse30m !== undefined && prevRes.vitesse30m > 0;
+                    const assignedRunner = runners.find(r => r.studentNumber === student.numeroEleve);
+                    const isAssignedInCurrentRace = !!assignedRunner;
+
+                    // Clean sequential number (#1, #2, #3...) - never the 10-char Massar code!
+                    const studentIdxInClass = students.findIndex(s => s.numeroEleve === student.numeroEleve);
+                    const displayOrderNumber = student.orderIndex || (studentIdxInClass >= 0 ? studentIdxInClass + 1 : idx + 1);
+
+                    return (
+                      <button
+                        key={student.numeroEleve}
+                        type="button"
+                        onClick={() => {
+                          if (isAssignedInCurrentRace) {
+                            handleUnassignStudent(assignedRunner.laneIndex);
+                          } else {
+                            handleAssignStudent(targetLane, student.numeroEleve);
+                          }
+                        }}
+                        className={`flex items-center justify-between p-3 rounded-2xl transition-all text-right cursor-pointer select-none border-2 gap-2.5 ${
+                          isAssignedInCurrentRace
+                            ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-500 text-emerald-900 dark:text-emerald-200 shadow-sm ring-2 ring-emerald-500/20'
+                            : hasTested
+                            ? 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-amber-400 hover:bg-amber-50/40 dark:hover:bg-gray-750'
+                            : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-amber-500 hover:bg-amber-50/50 dark:hover:bg-gray-750'
+                        }`}
+                      >
+                        {/* Right / Start: Order Number & Name */}
+                        <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
+                          <span className={`w-9 h-9 min-w-[36px] max-w-[36px] rounded-xl font-mono font-black text-xs flex items-center justify-center shrink-0 shadow-xs ${
+                            isAssignedInCurrentRace
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-gray-150 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
+                          }`}>
+                            #{displayOrderNumber}
+                          </span>
+
+                          <div className="min-w-0 flex-1 text-right overflow-hidden">
+                            <div className="text-xs sm:text-sm font-black text-gray-900 dark:text-white truncate block">
+                              {student.nomEleve}
+                            </div>
+                            {hasTested && (
+                              <div className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                                مسجل: {prevRes.vitesse30m?.toFixed(2)} ث
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Status Tag on Left */}
+                        <div className="shrink-0">
+                          {isAssignedInCurrentRace ? (
+                            <span className="px-2.5 py-1 text-[11px] font-black rounded-xl bg-emerald-600 text-white shadow-xs">
+                              الممر #{assignedRunner.laneIndex}
+                            </span>
+                          ) : (
+                            <span className="w-7 h-7 rounded-xl bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 flex items-center justify-center text-sm font-black opacity-70 hover:opacity-100">
+                              +
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+          </div>
+
           {/* LOWER SECTION: RESULTS TABLE & UNTESTED ROSTER */}
-          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
             {/* Tabs Bar */}
             <div className="flex items-center justify-between gap-3 mb-3">
               <div className="flex items-center gap-2">
@@ -1018,36 +1177,41 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
-                    {untestedStudents.map((student) => (
-                      <div
-                        key={student.numeroEleve}
-                        className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-2xl border border-gray-200 dark:border-gray-700 flex flex-col justify-between"
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-mono text-xs font-bold text-gray-400">
-                            #{student.orderIndex || student.numeroEleve}
-                          </span>
-                          <span 
-                            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer select-none transition-all duration-150 hover:scale-110 active:scale-95 border ${student.sexe === 'F' ? 'bg-pink-100 text-pink-700 border-pink-200' : 'bg-blue-100 text-blue-700 border-blue-200'}`}
-                            title="انقر مرتين لتغيير الجنس بين ذكر وأنثى"
-                            onDoubleClick={(e) => {
-                              e.stopPropagation();
-                              handleGenderInteraction(student.numeroEleve, false);
-                            }}
-                            onTouchEnd={(e) => {
-                              e.stopPropagation();
-                              handleGenderInteraction(student.numeroEleve, true);
-                            }}
-                          >
-                            <span>{student.sexe === 'F' ? 'أنثى' : 'ذكر'}</span>
-                            <span className="text-[9px] opacity-40">⇄</span>
-                          </span>
+                    {untestedStudents.map((student, idx) => {
+                      const studentIdxInClass = students.findIndex(s => s.numeroEleve === student.numeroEleve);
+                      const displayOrderNumber = student.orderIndex || (studentIdxInClass >= 0 ? studentIdxInClass + 1 : idx + 1);
+
+                      return (
+                        <div
+                          key={student.numeroEleve}
+                          className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-2xl border border-gray-200 dark:border-gray-700 flex flex-col justify-between"
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-mono text-xs font-bold text-gray-400">
+                              #{displayOrderNumber}
+                            </span>
+                            <span 
+                              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer select-none transition-all duration-150 hover:scale-110 active:scale-95 border ${student.sexe === 'F' ? 'bg-pink-100 text-pink-700 border-pink-200' : 'bg-blue-100 text-blue-700 border-blue-200'}`}
+                              title="انقر مرتين لتغيير الجنس بين ذكر وأنثى"
+                              onDoubleClick={(e) => {
+                                e.stopPropagation();
+                                handleGenderInteraction(student.numeroEleve, false);
+                              }}
+                              onTouchEnd={(e) => {
+                                e.stopPropagation();
+                                handleGenderInteraction(student.numeroEleve, true);
+                              }}
+                            >
+                              <span>{student.sexe === 'F' ? 'أنثى' : 'ذكر'}</span>
+                              <span className="text-[9px] opacity-40">⇄</span>
+                            </span>
+                          </div>
+                          <div className="text-xs font-bold text-gray-900 dark:text-white truncate">
+                            {student.nomEleve}
+                          </div>
                         </div>
-                        <div className="text-xs font-bold text-gray-900 dark:text-white truncate">
-                          {student.nomEleve}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
