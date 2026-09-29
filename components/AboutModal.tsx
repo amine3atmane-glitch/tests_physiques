@@ -145,14 +145,16 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Modal Footer */}
-        <div className="px-5 py-3.5 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80 flex items-center justify-between">
-          <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400">
-            تطبيق مخصص لأساتذة مادة التربية البدنية والرياضية • EPS Morocco
+        <div className="px-5 py-3.5 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80 flex items-center justify-between gap-3">
+          <span className="text-[11px] font-semibold text-gray-600 dark:text-gray-300">
+            {isAr 
+              ? 'برمجة وتطوير:  أمين سنوسي مفتش تربوي وعمر حماني أستاذ التعليم الثانوي الإعدادي'
+              : 'Développement & Conception : Amine Sanoussi (Inspecteur EPS) et Omar Hamani (Professeur de l\'enseignement secondaire collégial)'}
           </span>
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md transition"
+            className="shrink-0 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md transition"
           >
             {isAr ? 'فهمت، إغلاق' : 'Fermer'}
           </button>

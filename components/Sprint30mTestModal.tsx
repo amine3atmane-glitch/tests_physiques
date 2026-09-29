@@ -549,41 +549,41 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
           </div>
 
           {/* Main Stopwatch Window */}
-          <div className="flex flex-col items-center justify-center p-5 sm:p-6 bg-gradient-to-br from-gray-900 via-gray-800 to-slate-900 text-white rounded-3xl shadow-xl border border-gray-700 relative overflow-hidden">
-            <div className="text-xs font-bold text-amber-400 uppercase tracking-widest mb-1 flex items-center gap-2">
-              <span>عداد السرعة المباشر (30 م)</span>
-              <span className="text-gray-400 font-normal">|</span>
-              <span className="text-emerald-400">👆 اللمس المتعدد مفعل (وصول متزامن)</span>
+          <div className="flex flex-col items-center justify-center p-3 sm:p-5 bg-gradient-to-br from-gray-900 via-gray-800 to-slate-900 text-white rounded-2xl sm:rounded-3xl shadow-xl border border-gray-700 relative overflow-hidden">
+            <div className="text-[10px] sm:text-xs font-bold text-amber-400 uppercase tracking-wider mb-0.5 flex items-center gap-1.5">
+              <span>عداد السرعة (30 م)</span>
+              <span className="text-gray-500 font-normal">|</span>
+              <span className="text-emerald-400">👆 لمس متعدد</span>
             </div>
 
             {/* Digital Timer Value */}
-            <div className="text-5xl sm:text-7xl font-mono font-black tracking-wider text-amber-400 drop-shadow-md my-2">
-              {formattedSeconds} <span className="text-2xl font-bold text-gray-400">ثانية</span>
+            <div className="text-4xl sm:text-6xl font-mono font-black tracking-wider text-amber-400 drop-shadow-md my-1 sm:my-1.5">
+              {formattedSeconds} <span className="text-base sm:text-xl font-bold text-gray-400">ثانية</span>
             </div>
 
             {/* Race Instructions / State Banner */}
-            <div className="text-xs text-center text-gray-300 mb-3 max-w-xl">
+            <div className="text-[10px] sm:text-xs text-center text-gray-300 mb-2 max-w-xl px-1">
               {testState === 'idle' && (
-                <span>اضغط على زر <strong>الانطلاق 🚀</strong> للبدء، ثم المس بطاقة كل ممر عند خط النهاية فور وصول العداء لتسجيل الزمن.</span>
+                <span>اضغط <strong>الانطلاق 🚀</strong>، ثم المس بطاقة الممر عند خط النهاية.</span>
               )}
               {testState === 'running' && (
-                <span className="text-amber-300 font-bold animate-pulse">⚡ السباق جارٍ! المس بطاقة الممر المقابل فور وصول المتسابق لخط النهاية 🏁</span>
+                <span className="text-amber-300 font-bold animate-pulse">⚡ جارٍ! المس بطاقة الممر فور وصول التلميذ 🏁</span>
               )}
               {testState === 'paused' && (
-                <span className="text-emerald-300 font-bold">✅ تم إيقاف السباق مؤقتاً. يمكنك الآن تسجيل اسم أو رقم كل تلميذ أسفل بطاقته.</span>
+                <span className="text-emerald-300 font-bold">✅ متوقف مؤقتاً. حدد اسم أو رقم كل تلميذ أسفل بطاقته.</span>
               )}
             </div>
 
             {/* Action Buttons (Icon-Only with Hover Tooltips) */}
-            <div className="flex items-center gap-4 mt-1 flex-wrap justify-center">
+            <div className="flex items-center gap-2.5 sm:gap-4 mt-0.5 justify-center">
               {testState === 'idle' && (
                 <div className="relative group">
                   <button
                     onClick={startTimer}
                     aria-label="بدء السباق الانطلاق"
-                    className="p-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl shadow-lg shadow-emerald-600/30 transition transform hover:scale-105 active:scale-95 cursor-pointer"
+                    className="p-2.5 sm:p-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl sm:rounded-2xl shadow-lg shadow-emerald-600/30 transition transform hover:scale-105 active:scale-95 cursor-pointer"
                   >
-                    <PlayIcon className="w-7 h-7 fill-current" />
+                    <PlayIcon className="w-5 h-5 sm:w-6 sm:h-6 fill-current" />
                   </button>
                   <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 text-xs font-black bg-gray-900 text-white px-3 py-1 rounded-xl shadow-xl whitespace-nowrap z-50 border border-gray-700">
                     بدء السباق الانطلاق 🚀
@@ -596,9 +596,9 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
                   <button
                     onClick={pauseTimer}
                     aria-label="إيقاف مؤقت"
-                    className="p-3.5 bg-amber-500 hover:bg-amber-400 text-white font-black rounded-2xl shadow-lg shadow-amber-500/30 transition transform hover:scale-105 active:scale-95 cursor-pointer"
+                    className="p-2.5 sm:p-3.5 bg-amber-500 hover:bg-amber-400 text-white font-black rounded-xl sm:rounded-2xl shadow-lg shadow-amber-500/30 transition transform hover:scale-105 active:scale-95 cursor-pointer"
                   >
-                    <PauseIcon className="w-7 h-7" />
+                    <PauseIcon className="w-5 h-5 sm:w-6 sm:h-6" />
                   </button>
                   <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 text-xs font-black bg-gray-900 text-white px-3 py-1 rounded-xl shadow-xl whitespace-nowrap z-50 border border-gray-700">
                     إيقاف مؤقت ⏸️
@@ -611,9 +611,9 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
                   <button
                     onClick={startTimer}
                     aria-label="متابعة"
-                    className="p-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl shadow-lg shadow-emerald-600/30 transition transform hover:scale-105 active:scale-95 cursor-pointer"
+                    className="p-2.5 sm:p-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl sm:rounded-2xl shadow-lg shadow-emerald-600/30 transition transform hover:scale-105 active:scale-95 cursor-pointer"
                   >
-                    <PlayIcon className="w-7 h-7 fill-current" />
+                    <PlayIcon className="w-5 h-5 sm:w-6 sm:h-6 fill-current" />
                   </button>
                   <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 text-xs font-black bg-gray-900 text-white px-3 py-1 rounded-xl shadow-xl whitespace-nowrap z-50 border border-gray-700">
                     متابعة العداد ▶️
@@ -625,9 +625,9 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
                 <button
                   onClick={resetTimer}
                   aria-label="إعادة ضبط العداد"
-                  className="p-3.5 bg-gray-700 hover:bg-gray-600 text-gray-200 font-bold rounded-2xl transition transform hover:scale-105 active:scale-95 cursor-pointer"
+                  className="p-2.5 sm:p-3.5 bg-gray-700 hover:bg-gray-600 text-gray-200 font-bold rounded-xl sm:rounded-2xl transition transform hover:scale-105 active:scale-95 cursor-pointer"
                 >
-                  <ArrowPathIcon className="w-7 h-7" />
+                  <ArrowPathIcon className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
                 <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 text-xs font-black bg-gray-900 text-white px-3 py-1 rounded-xl shadow-xl whitespace-nowrap z-50 border border-gray-700">
                   إعادة ضبط العداد 🔄
@@ -638,261 +638,268 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
                 <button
                   onClick={prepareNextRun}
                   aria-label="السباق التالي"
-                  className="p-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl shadow-lg shadow-indigo-600/30 transition transform hover:scale-105 active:scale-95 cursor-pointer"
+                  className="p-2.5 sm:p-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl sm:rounded-2xl shadow-lg shadow-indigo-600/30 transition transform hover:scale-105 active:scale-95 cursor-pointer"
                 >
-                  <ChevronRightIcon className="w-7 h-7 rotate-180" />
+                  <ChevronRightIcon className="w-5 h-5 sm:w-6 sm:h-6 rotate-180" />
                 </button>
                 <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 text-xs font-black bg-gray-900 text-white px-3 py-1 rounded-xl shadow-xl whitespace-nowrap z-50 border border-gray-700">
-                  السباق التالي ⏩ (تفريغ الممرات للعدائين الجدد)
+                  السباق التالي ⏩
                 </div>
               </div>
             </div>
           </div>
 
           {/* ACTIVE LANES GRID: TOUCH TO RECORD TIME + POST-RACE STUDENT REGISTRATION */}
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
-              <div>
-                <h3 className="text-sm font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
-                  <UserGroupIcon className="w-5 h-5 text-amber-600" />
-                  <span>ممرات السباق ({runners.length} ممرات):</span>
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  المس الممر لتسجيل زمن الوصول مباشرة، ثم حدد اسم أو رقم التلميذ المسجل لهذا التوقيت
-                </p>
-              </div>
+          <div className="space-y-2.5 sm:space-y-4">
+            <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-xs sm:text-sm font-extrabold text-gray-900 dark:text-white flex items-center gap-1.5">
+                <UserGroupIcon className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600" />
+                <span>ممرات السباق ({runners.length}):</span>
+              </h3>
 
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 rounded-xl border border-amber-300 dark:border-amber-800">
-                  الوصول المسجل: {finishedLanesCount} من {runners.length}
+              <div className="flex items-center gap-1.5">
+                <span className="inline-flex items-center text-[10px] sm:text-[11px] font-bold px-2 py-0.5 bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 rounded-lg border border-amber-300 dark:border-amber-800">
+                  مسجل: {finishedLanesCount}/{runners.length}
                 </span>
               </div>
             </div>
 
-            {/* Lanes Grid */}
-            <div className={`grid grid-cols-1 ${runners.length === 2 ? 'sm:grid-cols-2' : runners.length === 3 ? 'sm:grid-cols-3' : runners.length === 4 ? 'sm:grid-cols-2 lg:grid-cols-4' : 'max-w-md mx-auto'} gap-4`}>
-              {runners.map(runner => {
-                const assignedStudent = students.find(s => s.numeroEleve === runner.studentNumber);
-                const isExAequo = runner.isFinished && runner.recordedTime !== undefined &&
-                  runners.some(r => r.laneIndex !== runner.laneIndex && r.isFinished && r.recordedTime === runner.recordedTime);
+            {/* Lanes Grid - Always Side-by-Side (جنباً إلى جنب) */}
+            <div className="w-full overflow-x-auto pb-1 custom-scrollbar">
+              <div 
+                className={`grid gap-1.5 sm:gap-3 ${
+                  runners.length === 1 
+                    ? 'grid-cols-1 max-w-xs mx-auto' 
+                    : runners.length === 2 
+                      ? 'grid-cols-2' 
+                      : runners.length === 3 
+                        ? 'grid-cols-3 min-w-[340px] sm:min-w-0' 
+                        : 'grid-cols-4 min-w-[420px] sm:min-w-0'
+                }`}
+              >
+                {runners.map(runner => {
+                  const assignedStudent = students.find(s => s.numeroEleve === runner.studentNumber);
+                  const isExAequo = runner.isFinished && runner.recordedTime !== undefined &&
+                    runners.some(r => r.laneIndex !== runner.laneIndex && r.isFinished && r.recordedTime === runner.recordedTime);
 
-                const searchQuery = (laneSearchQuery[runner.laneIndex] || '').toLowerCase();
-                const filteredStudents = students.filter(s => {
-                  if (!searchQuery) return true;
-                  const orderMatch = s.orderIndex && String(s.orderIndex).includes(searchQuery);
-                  const numMatch = s.numeroEleve.includes(searchQuery);
-                  const nameMatch = s.nomEleve.toLowerCase().includes(searchQuery);
-                  return orderMatch || numMatch || nameMatch;
-                });
+                  const searchQuery = (laneSearchQuery[runner.laneIndex] || '').toLowerCase();
+                  const filteredStudents = students.filter(s => {
+                    if (!searchQuery) return true;
+                    const orderMatch = s.orderIndex && String(s.orderIndex).includes(searchQuery);
+                    const numMatch = s.numeroEleve.includes(searchQuery);
+                    const nameMatch = s.nomEleve.toLowerCase().includes(searchQuery);
+                    return orderMatch || numMatch || nameMatch;
+                  });
 
-                return (
-                  <div
-                    key={runner.laneIndex}
-                    className={`flex flex-col justify-between p-4 rounded-3xl border-2 transition-all shadow-md ${
-                      runner.isFinished
-                        ? 'bg-white dark:bg-gray-800 border-emerald-500 dark:border-emerald-500 ring-2 ring-emerald-500/20'
-                        : testState === 'running'
-                        ? 'bg-amber-500/10 border-amber-500 animate-pulse'
-                        : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
-                    }`}
-                  >
-                    {/* Lane Header Bar */}
-                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-gray-100 dark:border-gray-700">
-                      <span className="text-xs font-black px-2.5 py-1 rounded-xl bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300">
-                        الممر #{runner.laneIndex}
-                      </span>
-
-                      {isExAequo && (
-                        <span className="px-2 py-0.5 rounded-lg text-[10px] font-extrabold bg-amber-400 text-gray-900 shadow-xs">
-                          🤝 متزامن (Ex æquo)
+                  return (
+                    <div
+                      key={runner.laneIndex}
+                      className={`flex flex-col justify-between p-2 sm:p-3 rounded-2xl sm:rounded-3xl border-2 transition-all shadow-sm ${
+                        runner.isFinished
+                          ? 'bg-white dark:bg-gray-800 border-emerald-500 dark:border-emerald-500 ring-2 ring-emerald-500/20'
+                          : testState === 'running'
+                          ? 'bg-amber-500/10 border-amber-500 animate-pulse'
+                          : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                      }`}
+                    >
+                      {/* Lane Header Bar */}
+                      <div className="flex items-center justify-between pb-1 mb-1 border-b border-gray-100 dark:border-gray-700">
+                        <span className="text-[10px] sm:text-xs font-black px-1.5 sm:px-2 py-0.5 rounded-lg bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300">
+                          ممر {runner.laneIndex}
                         </span>
-                      )}
 
-                      {runner.isFinished && (
-                        <button
-                          onClick={() => handleCancelLaneTime(runner.laneIndex)}
-                          title="إلغاء هذا التوقيت"
-                          className="text-[11px] text-gray-400 hover:text-red-500 transition cursor-pointer"
-                        >
-                          إلغاء 🔄
-                        </button>
-                      )}
-                    </div>
+                        {isExAequo && (
+                          <span className="px-1 py-0.5 rounded text-[8px] sm:text-[9px] font-extrabold bg-amber-400 text-gray-900">
+                            🤝 متزامن
+                          </span>
+                        )}
 
-                    {/* BIG FINISH TOUCH TARGET */}
-                    {!runner.isFinished ? (
-                      <button
-                        onTouchStart={(e) => handleLaneTouchStart(e, runner.laneIndex)}
-                        onClick={() => handleLaneClick(runner.laneIndex)}
-                        disabled={testState === 'idle'}
-                        className={`w-full py-8 px-3 rounded-2xl flex flex-col items-center justify-center text-center transition-all transform active:scale-95 cursor-pointer touch-manipulation select-none border-2 border-dashed ${
-                          testState === 'running'
-                            ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-400 shadow-lg shadow-amber-500/30'
-                            : 'bg-gray-100 dark:bg-gray-700/50 text-gray-400 border-gray-300 dark:border-gray-600'
-                        }`}
-                      >
-                        <CheckCircleIcon className={`w-8 h-8 mb-1 ${testState === 'running' ? 'animate-bounce' : ''}`} />
-                        <span className="text-sm font-black">
-                          {testState === 'running' ? 'المس للتسجيل عند الوصول 🏁' : 'جاهز للانطلاق'}
-                        </span>
-                        <span className="text-[10px] opacity-80 mt-0.5">
-                          {testState === 'running' ? 'تجميد التوقيت فور خط النهاية' : 'اضغط زر البدء لتشغيل العداد'}
-                        </span>
-                      </button>
-                    ) : (
-                      /* FINISHED TIME DISPLAY */
-                      <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-2xl border border-emerald-300 dark:border-emerald-800 text-center mb-3">
-                        <div className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 uppercase">
-                          التوقيت المسجل للممر #{runner.laneIndex}
-                        </div>
-                        <div className="text-3xl font-mono font-black text-emerald-800 dark:text-emerald-200 tracking-wide my-0.5">
-                          {runner.recordedTime?.toFixed(2)}
-                        </div>
-                        <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                          السرعة: {runner.recordedTime ? ((30 / runner.recordedTime) * 3.6).toFixed(1) : '-'} كم/س
-                        </div>
-                      </div>
-                    )}
-
-                    {/* POST-TEST STUDENT IDENTIFICATION (RECORD NAME / NUMBER AFTER TEST) */}
-                    {runner.isFinished && (
-                      <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                        {assignedStudent ? (
-                          /* ALREADY ASSIGNED STUDENT VIEW */
-                          <div className="p-3 bg-gray-50 dark:bg-gray-700/60 rounded-2xl border border-emerald-400/50 flex flex-col gap-2">
-                            <div className="flex items-center justify-between">
-                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
-                                <CheckIcon className="w-4 h-4 text-emerald-500" />
-                                <span>تم ربط النتيجة بنجاح:</span>
-                              </span>
-                              <button
-                                onClick={() => handleUnassignStudent(runner.laneIndex)}
-                                className="text-[11px] font-bold text-amber-600 hover:text-amber-700 dark:text-amber-400 flex items-center gap-0.5 cursor-pointer"
-                              >
-                                <PencilSquareIcon className="w-3.5 h-3.5" />
-                                <span>تغيير</span>
-                              </button>
-                            </div>
-
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <div className="text-xs font-mono font-bold text-gray-400">
-                                  #{assignedStudent.orderIndex || assignedStudent.numeroEleve}
-                                </div>
-                                <div className="text-sm font-black text-gray-900 dark:text-white truncate">
-                                  {assignedStudent.nomEleve}
-                                </div>
-                              </div>
-                              <span 
-                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold cursor-pointer select-none transition-all duration-150 hover:scale-110 active:scale-95 border ${assignedStudent.sexe === 'F' ? 'bg-pink-100 text-pink-700 border-pink-200' : 'bg-blue-100 text-blue-700 border-blue-200'}`}
-                                title="انقر مرتين لتغيير الجنس بين ذكر وأنثى"
-                                onDoubleClick={(e) => {
-                                  e.stopPropagation();
-                                  handleGenderInteraction(assignedStudent.numeroEleve, false);
-                                }}
-                                onTouchEnd={(e) => {
-                                  e.stopPropagation();
-                                  handleGenderInteraction(assignedStudent.numeroEleve, true);
-                                }}
-                              >
-                                <span>{assignedStudent.sexe === 'F' ? 'أنثى' : 'ذكر'}</span>
-                                <span className="text-[9px] opacity-40">⇄</span>
-                              </span>
-                            </div>
-                          </div>
-                        ) : (
-                          /* UNASSIGNED: ENTER OR SELECT STUDENT NAME / NUMBER */
-                          <div className="space-y-2">
-                            <div className="text-xs font-black text-amber-700 dark:text-amber-400 flex items-center justify-between">
-                              <span>✍️ سجل اسم أو رقم التلميذ:</span>
-                            </div>
-
-                            {/* Option 1: Fast Number Quick-Entry Input */}
-                            <div className="flex gap-1.5">
-                              <input
-                                type="text"
-                                placeholder="رقم التلميذ (#)"
-                                value={quickNumberInput[runner.laneIndex] || ''}
-                                onChange={(e) => setQuickNumberInput(prev => ({ ...prev, [runner.laneIndex]: e.target.value }))}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    handleQuickNumberSubmit(runner.laneIndex);
-                                  }
-                                }}
-                                className="w-full px-2.5 py-1.5 text-xs font-bold bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-amber-500 text-right"
-                              />
-                              <button
-                                onClick={() => handleQuickNumberSubmit(runner.laneIndex)}
-                                className="px-3 py-1.5 text-xs font-black bg-amber-600 hover:bg-amber-500 text-white rounded-xl shrink-0 cursor-pointer shadow-xs"
-                              >
-                                حفظ
-                              </button>
-                            </div>
-
-                            {/* Option 2: Searchable Dropdown / Selector */}
-                            <div className="relative">
-                              <input
-                                type="text"
-                                placeholder="أو ابحث بالاسم في القسم..."
-                                value={laneSearchQuery[runner.laneIndex] || ''}
-                                onChange={(e) => setLaneSearchQuery(prev => ({ ...prev, [runner.laneIndex]: e.target.value }))}
-                                className="w-full px-2.5 py-1 text-[11px] bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-right"
-                              />
-                            </div>
-
-                            {/* Quick Scrollable Student List for 1-Tap Assignment */}
-                            <div className="max-h-36 overflow-y-auto space-y-1 p-1 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200/80 dark:border-gray-700/80 custom-scrollbar">
-                              {filteredStudents.length === 0 ? (
-                                <div className="text-[10px] text-gray-400 p-2 text-center">لا يوجد تلميذ مطابق</div>
-                              ) : (
-                                filteredStudents.map(student => {
-                                  const prevRes = physicalResults.find(r => r.numeroEleve === student.numeroEleve);
-                                  const hasTested = prevRes?.vitesse30m !== undefined && prevRes.vitesse30m > 0;
-                                  const isSelectedInOtherLane = runners.some(r => r.laneIndex !== runner.laneIndex && r.studentNumber === student.numeroEleve);
-
-                                  return (
-                                    <button
-                                      key={student.numeroEleve}
-                                      disabled={isSelectedInOtherLane}
-                                      onClick={() => handleAssignStudent(runner.laneIndex, student.numeroEleve)}
-                                      className={`w-full flex items-center justify-between p-1.5 rounded-lg text-right text-xs transition cursor-pointer ${
-                                        isSelectedInOtherLane
-                                          ? 'opacity-40 bg-gray-100 dark:bg-gray-800'
-                                          : 'hover:bg-amber-100 dark:hover:bg-amber-950/60 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700'
-                                      }`}
-                                    >
-                                      <div className="flex items-center gap-1.5 truncate">
-                                        <span className="font-mono font-bold text-gray-400 text-[10px]">
-                                          #{student.orderIndex || student.numeroEleve}
-                                        </span>
-                                        <span className="font-bold text-gray-900 dark:text-gray-100 truncate">
-                                          {student.nomEleve}
-                                        </span>
-                                      </div>
-
-                                      <div className="flex items-center gap-1 shrink-0">
-                                        {!hasTested ? (
-                                          <span className="text-[9px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950 px-1.5 py-0.2 rounded">
-                                            لم يجتز
-                                          </span>
-                                        ) : (
-                                          <span className="text-[9px] font-mono text-emerald-600 dark:text-emerald-400">
-                                            {prevRes.vitesse30m?.toFixed(2)}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </button>
-                                  );
-                                })
-                              )}
-                            </div>
-                          </div>
+                        {runner.isFinished && (
+                          <button
+                            onClick={() => handleCancelLaneTime(runner.laneIndex)}
+                            title="إلغاء هذا التوقيت"
+                            className="text-[10px] text-gray-400 hover:text-red-500 transition cursor-pointer"
+                          >
+                            إلغاء 🔄
+                          </button>
                         )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+
+                      {/* BIG FINISH TOUCH TARGET */}
+                      {!runner.isFinished ? (
+                        <button
+                          onTouchStart={(e) => handleLaneTouchStart(e, runner.laneIndex)}
+                          onClick={() => handleLaneClick(runner.laneIndex)}
+                          disabled={testState === 'idle'}
+                          className={`w-full py-5 sm:py-7 px-1 rounded-xl sm:rounded-2xl flex flex-col items-center justify-center text-center transition-all transform active:scale-95 cursor-pointer touch-manipulation select-none border-2 border-dashed ${
+                            testState === 'running'
+                              ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-400 shadow-md shadow-amber-500/30'
+                              : 'bg-gray-100 dark:bg-gray-700/50 text-gray-400 border-gray-300 dark:border-gray-600'
+                          }`}
+                        >
+                          <CheckCircleIcon className={`w-6 h-6 sm:w-7 sm:h-7 mb-0.5 ${testState === 'running' ? 'animate-bounce' : ''}`} />
+                          <span className="text-[11px] sm:text-xs font-black leading-tight">
+                            {testState === 'running' ? 'المس هنا 🏁' : 'جاهز'}
+                          </span>
+                          <span className="text-[8px] sm:text-[9px] opacity-80 mt-0.5">
+                            {testState === 'running' ? 'تسجيل الزمن' : 'اضغط بدء'}
+                          </span>
+                        </button>
+                      ) : (
+                        /* FINISHED TIME DISPLAY */
+                        <div className="p-1.5 sm:p-2 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl sm:rounded-2xl border border-emerald-300 dark:border-emerald-800 text-center mb-1.5">
+                          <div className="text-[9px] sm:text-[10px] font-bold text-emerald-700 dark:text-emerald-300 uppercase">
+                            الممر #{runner.laneIndex}
+                          </div>
+                          <div className="text-xl sm:text-2xl font-mono font-black text-emerald-800 dark:text-emerald-200 tracking-tight my-0.5">
+                            {runner.recordedTime?.toFixed(2)}
+                          </div>
+                          <div className="text-[8px] sm:text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                            {runner.recordedTime ? ((30 / runner.recordedTime) * 3.6).toFixed(1) : '-'} كم/س
+                          </div>
+                        </div>
+                      )}
+
+                      {/* POST-TEST STUDENT IDENTIFICATION (RECORD NAME / NUMBER AFTER TEST) */}
+                      {runner.isFinished && (
+                        <div className="mt-1 pt-1 border-t border-gray-200 dark:border-gray-700">
+                          {assignedStudent ? (
+                            /* ALREADY ASSIGNED STUDENT VIEW */
+                            <div className="p-1.5 sm:p-2 bg-gray-50 dark:bg-gray-700/60 rounded-xl border border-emerald-400/50 flex flex-col gap-1">
+                              <div className="flex items-center justify-between">
+                                <span className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
+                                  <CheckIcon className="w-3 h-3 text-emerald-500" />
+                                  <span>تم الربط:</span>
+                                </span>
+                                <button
+                                  onClick={() => handleUnassignStudent(runner.laneIndex)}
+                                  className="text-[9px] sm:text-[10px] font-bold text-amber-600 hover:text-amber-700 dark:text-amber-400 flex items-center gap-0.5 cursor-pointer"
+                                >
+                                  <PencilSquareIcon className="w-2.5 h-2.5" />
+                                  <span>تغيير</span>
+                                </button>
+                              </div>
+
+                              <div className="flex items-center justify-between gap-1">
+                                <div className="truncate min-w-0">
+                                  <div className="text-[9px] font-mono font-bold text-gray-400">
+                                    #{assignedStudent.orderIndex || assignedStudent.numeroEleve}
+                                  </div>
+                                  <div className="text-[11px] sm:text-xs font-black text-gray-900 dark:text-white truncate">
+                                    {assignedStudent.nomEleve}
+                                  </div>
+                                </div>
+                                <span 
+                                  className={`inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[8px] sm:text-[9px] font-bold cursor-pointer select-none shrink-0 border ${assignedStudent.sexe === 'F' ? 'bg-pink-100 text-pink-700 border-pink-200' : 'bg-blue-100 text-blue-700 border-blue-200'}`}
+                                  title="انقر مرتين لتغيير الجنس"
+                                  onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    handleGenderInteraction(assignedStudent.numeroEleve, false);
+                                  }}
+                                  onTouchEnd={(e) => {
+                                    e.stopPropagation();
+                                    handleGenderInteraction(assignedStudent.numeroEleve, true);
+                                  }}
+                                >
+                                  <span>{assignedStudent.sexe === 'F' ? 'أنثى' : 'ذكر'}</span>
+                                  <span className="text-[7px] opacity-40">⇄</span>
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            /* UNASSIGNED: ENTER OR SELECT STUDENT NAME / NUMBER */
+                            <div className="space-y-1">
+                              <div className="text-[9px] sm:text-[10px] font-black text-amber-700 dark:text-amber-400 flex items-center justify-between">
+                                <span>✍️ رقم التلميذ:</span>
+                              </div>
+
+                              {/* Option 1: Fast Number Quick-Entry Input */}
+                              <div className="flex gap-1">
+                                <input
+                                  type="text"
+                                  placeholder="رقم (#)"
+                                  value={quickNumberInput[runner.laneIndex] || ''}
+                                  onChange={(e) => setQuickNumberInput(prev => ({ ...prev, [runner.laneIndex]: e.target.value }))}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleQuickNumberSubmit(runner.laneIndex);
+                                    }
+                                  }}
+                                  className="w-full px-1.5 py-0.5 text-[11px] font-bold bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-1 focus:ring-amber-500 text-right"
+                                />
+                                <button
+                                  onClick={() => handleQuickNumberSubmit(runner.laneIndex)}
+                                  className="px-2 py-0.5 text-[10px] font-black bg-amber-600 hover:bg-amber-500 text-white rounded-lg shrink-0 cursor-pointer"
+                                >
+                                  حفظ
+                                </button>
+                              </div>
+
+                              {/* Option 2: Searchable Dropdown / Selector */}
+                              <div>
+                                <input
+                                  type="text"
+                                  placeholder="بحث بالاسم..."
+                                  value={laneSearchQuery[runner.laneIndex] || ''}
+                                  onChange={(e) => setLaneSearchQuery(prev => ({ ...prev, [runner.laneIndex]: e.target.value }))}
+                                  className="w-full px-1.5 py-0.5 text-[9px] bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md text-right"
+                                />
+                              </div>
+
+                              {/* Quick Scrollable Student List for 1-Tap Assignment */}
+                              <div className="max-h-24 sm:max-h-32 overflow-y-auto space-y-0.5 p-0.5 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200/80 dark:border-gray-700/80 custom-scrollbar">
+                                {filteredStudents.length === 0 ? (
+                                  <div className="text-[9px] text-gray-400 p-1 text-center">لا يوجد تلميذ</div>
+                                ) : (
+                                  filteredStudents.map(student => {
+                                    const prevRes = physicalResults.find(r => r.numeroEleve === student.numeroEleve);
+                                    const hasTested = prevRes?.vitesse30m !== undefined && prevRes.vitesse30m > 0;
+                                    const isSelectedInOtherLane = runners.some(r => r.laneIndex !== runner.laneIndex && r.studentNumber === student.numeroEleve);
+
+                                    return (
+                                      <button
+                                        key={student.numeroEleve}
+                                        disabled={isSelectedInOtherLane}
+                                        onClick={() => handleAssignStudent(runner.laneIndex, student.numeroEleve)}
+                                        className={`w-full flex items-center justify-between p-1 rounded text-right text-[10px] transition cursor-pointer ${
+                                          isSelectedInOtherLane
+                                            ? 'opacity-40 bg-gray-100 dark:bg-gray-800'
+                                            : 'hover:bg-amber-100 dark:hover:bg-amber-950/60 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700'
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-1 truncate min-w-0">
+                                          <span className="font-mono font-bold text-gray-400 text-[8px]">
+                                            #{student.orderIndex || student.numeroEleve}
+                                          </span>
+                                          <span className="font-bold text-gray-900 dark:text-gray-100 truncate text-[10px]">
+                                            {student.nomEleve}
+                                          </span>
+                                        </div>
+
+                                        <div className="flex items-center gap-1 shrink-0">
+                                          {!hasTested ? (
+                                            <span className="text-[7px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950 px-1 rounded">
+                                              -
+                                            </span>
+                                          ) : (
+                                            <span className="text-[7px] font-mono text-emerald-600 dark:text-emerald-400">
+                                              {prevRes.vitesse30m?.toFixed(2)}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </button>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
