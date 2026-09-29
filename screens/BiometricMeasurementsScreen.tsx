@@ -51,6 +51,11 @@ export const BiometricMeasurementsScreen: React.FC<BiometricMeasurementsScreenPr
     const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [modalStudentNumber, setModalStudentNumber] = useState<string | null>(null);
+    const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+
+    const testsDataRef = useRef<PhysicalTests[]>([]);
+    const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const statusResetTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     // Form data for individual card mode
     const [formData, setFormData] = useState<{
@@ -72,6 +77,7 @@ export const BiometricMeasurementsScreen: React.FC<BiometricMeasurementsScreenPr
         if (!className) {
             setStudentList([]);
             setTestsData([]);
+            testsDataRef.current = [];
             setSelectedStudent(null);
             return;
         }
@@ -88,8 +94,65 @@ export const BiometricMeasurementsScreen: React.FC<BiometricMeasurementsScreenPr
         });
 
         getPhysicalTests(className).then(res => {
-            setTestsData(res || []);
+            const data = res || [];
+            setTestsData(data);
+            testsDataRef.current = data;
         });
+    };
+
+    // Keep ref in sync
+    useEffect(() => {
+        testsDataRef.current = testsData;
+    }, [testsData]);
+
+    // Cleanup timer on unmount
+    useEffect(() => {
+        return () => {
+            if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+            if (statusResetTimerRef.current) clearTimeout(statusResetTimerRef.current);
+        };
+    }, []);
+
+    // Perform auto-save to IndexedDB
+    const triggerAutoSave = (updatedList: PhysicalTests[]) => {
+        if (!selectedClass) return;
+        setAutoSaveStatus('saving');
+        if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+
+        autoSaveTimerRef.current = setTimeout(async () => {
+            try {
+                await savePhysicalTests(selectedClass, updatedList);
+                window.dispatchEvent(new CustomEvent('dbUpdated'));
+                setAutoSaveStatus('saved');
+                if (statusResetTimerRef.current) clearTimeout(statusResetTimerRef.current);
+                statusResetTimerRef.current = setTimeout(() => {
+                    setAutoSaveStatus('idle');
+                }, 2500);
+            } catch (err) {
+                console.error('Auto-save error in biometric measurements:', err);
+                setAutoSaveStatus('idle');
+            }
+        }, 350);
+    };
+
+    // Immediate flush on blur
+    const handleInputBlur = async () => {
+        if (!selectedClass) return;
+        if (autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current);
+            autoSaveTimerRef.current = null;
+        }
+        try {
+            await savePhysicalTests(selectedClass, testsDataRef.current);
+            window.dispatchEvent(new CustomEvent('dbUpdated'));
+            setAutoSaveStatus('saved');
+            if (statusResetTimerRef.current) clearTimeout(statusResetTimerRef.current);
+            statusResetTimerRef.current = setTimeout(() => {
+                setAutoSaveStatus('idle');
+            }, 2500);
+        } catch (err) {
+            console.error('Immediate save on blur error:', err);
+        }
     };
 
     // Load data
@@ -172,14 +235,45 @@ export const BiometricMeasurementsScreen: React.FC<BiometricMeasurementsScreenPr
                     date: sessionDate || new Date().toISOString()
                 };
 
+            let next: PhysicalTests[];
             if (index >= 0) {
-                const next = [...prev];
+                next = [...prev];
                 next[index] = updatedItem;
-                return next;
             } else {
-                return [...prev, updatedItem];
+                next = [...prev, updatedItem];
             }
+            triggerAutoSave(next);
+            return next;
         });
+    };
+
+    // Handle individual card field change with auto-save
+    const handleCardFieldChange = (field: 'taille' | 'poids' | 'frequenceCardiaque', rawVal: string) => {
+        const numVal = rawVal === '' ? undefined : parseFloat(rawVal);
+        const updatedForm = { ...formData, [field]: numVal };
+        setFormData(updatedForm);
+
+        if (!selectedStudent) return;
+        const index = testsData.findIndex(r => r.numeroEleve === selectedStudent.numeroEleve);
+        const updatedItem: PhysicalTests = index >= 0 
+            ? { ...testsData[index], ...updatedForm, nomEleve: selectedStudent.nomEleve, sexe: selectedStudent.sexe }
+            : {
+                numeroEleve: selectedStudent.numeroEleve,
+                nomEleve: selectedStudent.nomEleve,
+                sexe: selectedStudent.sexe,
+                ...updatedForm,
+                date: sessionDate || new Date().toISOString()
+            };
+
+        let nextList = [...testsData];
+        if (index >= 0) {
+            nextList[index] = updatedItem;
+        } else {
+            nextList.push(updatedItem);
+        }
+
+        setTestsData(nextList);
+        triggerAutoSave(nextList);
     };
 
     // Save all table changes
@@ -187,6 +281,7 @@ export const BiometricMeasurementsScreen: React.FC<BiometricMeasurementsScreenPr
         try {
             await savePhysicalTests(selectedClass, testsData);
             window.dispatchEvent(new CustomEvent('dbUpdated'));
+            setAutoSaveStatus('saved');
             setNotification({
                 message: `${t.success} : تم حفظ قياسات القسم بنجاح.`,
                 type: 'success'
@@ -222,6 +317,7 @@ export const BiometricMeasurementsScreen: React.FC<BiometricMeasurementsScreenPr
 
         setTestsData(nextList);
         await savePhysicalTests(selectedClass, nextList);
+        setAutoSaveStatus('saved');
         setNotification({
             message: `${t.success}: تم حفظ قياسات ${selectedStudent.nomEleve}.`,
             type: 'success'
@@ -361,13 +457,28 @@ export const BiometricMeasurementsScreen: React.FC<BiometricMeasurementsScreenPr
                         </button>
                     </div>
 
+                    {/* Auto-Save Live Status Badge */}
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                        {autoSaveStatus === 'saving' ? (
+                            <>
+                                <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                                <span>جاري الحفظ...</span>
+                            </>
+                        ) : (
+                            <>
+                                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                <span>{language === 'ar' ? 'حفظ تلقائي مفعّل ✓' : 'Auto-save actif ✓'}</span>
+                            </>
+                        )}
+                    </div>
+
                     {viewMode === 'table' && (
                         <button
                             onClick={handleSaveAll}
                             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg shadow-sm text-white bg-emerald-600 hover:bg-emerald-700 transition"
                         >
                             <SaveIcon />
-                            <span>{t.save}</span>
+                            <span>{autoSaveStatus === 'saved' ? 'تم الحفظ ✓' : t.save}</span>
                         </button>
                     )}
 
@@ -517,6 +628,7 @@ export const BiometricMeasurementsScreen: React.FC<BiometricMeasurementsScreenPr
                                                     placeholder=""
                                                     value={record?.taille ?? ''}
                                                     onChange={(e) => handleTableValueChange(student.numeroEleve, 'taille', e.target.value)}
+                                                    onBlur={handleInputBlur}
                                                     className="w-20 text-center font-bold px-2 py-1 text-xs rounded-lg border border-gray-300 dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                                                 />
                                             </td>
@@ -531,6 +643,7 @@ export const BiometricMeasurementsScreen: React.FC<BiometricMeasurementsScreenPr
                                                     placeholder=""
                                                     value={record?.poids ?? ''}
                                                     onChange={(e) => handleTableValueChange(student.numeroEleve, 'poids', e.target.value)}
+                                                    onBlur={handleInputBlur}
                                                     className="w-20 text-center font-bold px-2 py-1 text-xs rounded-lg border border-gray-300 dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                                                 />
                                             </td>
@@ -557,6 +670,7 @@ export const BiometricMeasurementsScreen: React.FC<BiometricMeasurementsScreenPr
                                                     placeholder=""
                                                     value={record?.frequenceCardiaque ?? ''}
                                                     onChange={(e) => handleTableValueChange(student.numeroEleve, 'frequenceCardiaque', e.target.value)}
+                                                    onBlur={handleInputBlur}
                                                     className="w-20 text-center font-bold px-2 py-1 text-xs rounded-lg border border-gray-300 dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-1 focus:ring-rose-500 text-rose-600 dark:text-rose-400"
                                                 />
                                             </td>
@@ -673,7 +787,7 @@ export const BiometricMeasurementsScreen: React.FC<BiometricMeasurementsScreenPr
                                         className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 shadow-md transition"
                                     >
                                         <SaveIcon />
-                                        <span>{t.save}</span>
+                                        <span>{autoSaveStatus === 'saved' ? 'تم الحفظ ✓' : t.save}</span>
                                     </button>
                                 </div>
 
@@ -716,7 +830,8 @@ export const BiometricMeasurementsScreen: React.FC<BiometricMeasurementsScreenPr
                                                 max="230"
                                                 step="1"
                                                 value={formData.taille ?? ''}
-                                                onChange={(e) => setFormData(prev => ({ ...prev, taille: e.target.value === '' ? undefined : parseFloat(e.target.value) }))}
+                                                onChange={(e) => handleCardFieldChange('taille', e.target.value)}
+                                                onBlur={handleInputBlur}
                                                 placeholder=""
                                                 className="w-full text-xl font-bold py-2 px-3 rounded-lg border border-gray-300 dark:bg-gray-700 dark:border-gray-600 text-center"
                                             />
@@ -737,7 +852,8 @@ export const BiometricMeasurementsScreen: React.FC<BiometricMeasurementsScreenPr
                                                 max="160"
                                                 step="0.5"
                                                 value={formData.poids ?? ''}
-                                                onChange={(e) => setFormData(prev => ({ ...prev, poids: e.target.value === '' ? undefined : parseFloat(e.target.value) }))}
+                                                onChange={(e) => handleCardFieldChange('poids', e.target.value)}
+                                                onBlur={handleInputBlur}
                                                 placeholder=""
                                                 className="w-full text-xl font-bold py-2 px-3 rounded-lg border border-gray-300 dark:bg-gray-700 dark:border-gray-600 text-center"
                                             />
@@ -758,7 +874,8 @@ export const BiometricMeasurementsScreen: React.FC<BiometricMeasurementsScreenPr
                                                 max="220"
                                                 step="1"
                                                 value={formData.frequenceCardiaque ?? ''}
-                                                onChange={(e) => setFormData(prev => ({ ...prev, frequenceCardiaque: e.target.value === '' ? undefined : parseFloat(e.target.value) }))}
+                                                onChange={(e) => handleCardFieldChange('frequenceCardiaque', e.target.value)}
+                                                onBlur={handleInputBlur}
                                                 placeholder=""
                                                 className="w-full text-xl font-bold py-2 px-3 rounded-lg border border-gray-300 dark:bg-gray-700 dark:border-gray-600 text-center text-rose-600"
                                             />

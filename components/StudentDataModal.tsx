@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { StudentIdentity, PhysicalTests } from '../types';
 import { getCompleteStudentData, saveCompleteStudentData } from '../utils/db';
 import { useLanguage } from '../utils/i18n';
@@ -39,10 +39,14 @@ export const StudentDataModal: React.FC<StudentDataModalProps> = ({
 
   const [loading, setLoading] = useState<boolean>(true);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [activeTab, setActiveTab] = useState<'biometrics' | 'physical'>(
     defaultTab === 'vma' ? 'physical' : defaultTab
   );
   const [showIdentityEdit, setShowIdentityEdit] = useState<boolean>(false);
+
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const statusResetTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Identity state
   const [nomEleve, setNomEleve] = useState<string>('');
@@ -63,6 +67,132 @@ export const StudentDataModal: React.FC<StudentDataModalProps> = ({
     souplesseDebout?: string;
     equilibreStatique?: string;
   }>({});
+
+  // Cleanup timers
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+      if (statusResetTimerRef.current) clearTimeout(statusResetTimerRef.current);
+    };
+  }, []);
+
+  // Parse numeric value or undefined
+  const parseNum = (val?: string): number | undefined => {
+    if (!val || val.trim() === '') return undefined;
+    const n = parseFloat(val);
+    return isNaN(n) ? undefined : n;
+  };
+
+  // Perform auto-save to database
+  const triggerAutoSave = (
+    nextForm: typeof formData,
+    customNom?: string,
+    customNum?: string,
+    customSexe?: 'M' | 'F'
+  ) => {
+    if (!className || !studentNumber) return;
+    setAutoSaveStatus('saving');
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+
+    autoSaveTimerRef.current = setTimeout(async () => {
+      try {
+        const studentIdentity: StudentIdentity = {
+          nomEleve: (customNom ?? nomEleve).trim() || `تلميذ ${studentNumber}`,
+          numeroEleve: (customNum ?? currentNumeroEleve).trim() || studentNumber,
+          sexe: customSexe ?? sexe,
+        };
+
+        const physicalUpdates: Partial<PhysicalTests> = {
+          taille: parseNum(nextForm.taille),
+          poids: parseNum(nextForm.poids),
+          frequenceCardiaque: parseNum(nextForm.frequenceCardiaque),
+          vitesse30m: parseNum(nextForm.vitesse30m),
+          sautHorizontal: parseNum(nextForm.sautHorizontal),
+          sautVertical: parseNum(nextForm.sautVertical),
+          lancerMedball: parseNum(nextForm.lancerMedball),
+          souplesseAssis: parseNum(nextForm.souplesseAssis),
+          souplesseDebout: parseNum(nextForm.souplesseDebout),
+          equilibreStatique: parseNum(nextForm.equilibreStatique),
+        };
+
+        const vmaNum = parseNum(nextForm.vma);
+
+        await saveCompleteStudentData(
+          className,
+          studentNumber,
+          studentIdentity,
+          physicalUpdates,
+          vmaNum
+        );
+
+        setAutoSaveStatus('saved');
+        setSaveSuccess(true);
+        if (onDataSaved) onDataSaved();
+        window.dispatchEvent(new CustomEvent('dbUpdated'));
+
+        if (statusResetTimerRef.current) clearTimeout(statusResetTimerRef.current);
+        statusResetTimerRef.current = setTimeout(() => {
+          setAutoSaveStatus('idle');
+          setSaveSuccess(false);
+        }, 2500);
+      } catch (err) {
+        console.error('Auto-save error in StudentDataModal:', err);
+        setAutoSaveStatus('idle');
+      }
+    }, 350);
+  };
+
+  // Immediate flush save on blur
+  const handleFlushSave = async () => {
+    if (!className || !studentNumber) return;
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+    try {
+      const studentIdentity: StudentIdentity = {
+        nomEleve: nomEleve.trim() || `تلميذ ${studentNumber}`,
+        numeroEleve: currentNumeroEleve.trim() || studentNumber,
+        sexe,
+      };
+
+      const physicalUpdates: Partial<PhysicalTests> = {
+        taille: parseNum(formData.taille),
+        poids: parseNum(formData.poids),
+        frequenceCardiaque: parseNum(formData.frequenceCardiaque),
+        vitesse30m: parseNum(formData.vitesse30m),
+        sautHorizontal: parseNum(formData.sautHorizontal),
+        sautVertical: parseNum(formData.sautVertical),
+        lancerMedball: parseNum(formData.lancerMedball),
+        souplesseAssis: parseNum(formData.souplesseAssis),
+        souplesseDebout: parseNum(formData.souplesseDebout),
+        equilibreStatique: parseNum(formData.equilibreStatique),
+      };
+
+      const vmaNum = parseNum(formData.vma);
+
+      await saveCompleteStudentData(
+        className,
+        studentNumber,
+        studentIdentity,
+        physicalUpdates,
+        vmaNum
+      );
+
+      setAutoSaveStatus('saved');
+      setSaveSuccess(true);
+      if (onDataSaved) onDataSaved();
+      window.dispatchEvent(new CustomEvent('dbUpdated'));
+
+      if (statusResetTimerRef.current) clearTimeout(statusResetTimerRef.current);
+      statusResetTimerRef.current = setTimeout(() => {
+        setAutoSaveStatus('idle');
+        setSaveSuccess(false);
+      }, 2500);
+    } catch (err) {
+      console.error('Flush save error in StudentDataModal:', err);
+    }
+  };
 
   // Current index in allStudents list
   const currentIndex = allStudents.findIndex(s => s.numeroEleve === studentNumber);
@@ -129,8 +259,24 @@ export const StudentDataModal: React.FC<StudentDataModalProps> = ({
 
   // Handle Field change
   const handleFieldChange = (field: keyof typeof formData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    setSaveSuccess(false);
+    const next = { ...formData, [field]: value };
+    setFormData(next);
+    triggerAutoSave(next);
+  };
+
+  const handleNomChange = (val: string) => {
+    setNomEleve(val);
+    triggerAutoSave(formData, val, currentNumeroEleve, sexe);
+  };
+
+  const handleNumeroChange = (val: string) => {
+    setCurrentNumeroEleve(val);
+    triggerAutoSave(formData, nomEleve, val, sexe);
+  };
+
+  const handleSexeChange = (val: 'M' | 'F') => {
+    setSexe(val);
+    triggerAutoSave(formData, nomEleve, currentNumeroEleve, val);
   };
 
   // BMI Calculation
@@ -164,13 +310,6 @@ export const StudentDataModal: React.FC<StudentDataModalProps> = ({
       };
     }
   }
-
-  // Parse numeric value or undefined
-  const parseNum = (val?: string): number | undefined => {
-    if (!val || val.trim() === '') return undefined;
-    const n = parseFloat(val);
-    return isNaN(n) ? undefined : n;
-  };
 
   // Save changes
   const handleSave = async (andNext: boolean = false) => {
@@ -313,9 +452,24 @@ export const StudentDataModal: React.FC<StudentDataModalProps> = ({
           </div>
 
           {/* Navigation Controls & Close for Desktop/Tablet */}
-          <div className="hidden sm:flex items-center gap-1.5">
+          <div className="hidden sm:flex items-center gap-2">
+            {/* Auto-save status badge */}
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
+              {autoSaveStatus === 'saving' ? (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
+                  <span>جاري الحفظ...</span>
+                </>
+              ) : (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span>{language === 'ar' ? 'حفظ تلقائي مفعّل ✓' : 'Auto-save actif ✓'}</span>
+                </>
+              )}
+            </div>
+
             {allStudents.length > 1 && (
-              <div className="flex items-center bg-gray-200/70 dark:bg-gray-700/70 rounded-xl p-0.5 me-2">
+              <div className="flex items-center bg-gray-200/70 dark:bg-gray-700/70 rounded-xl p-0.5 me-1">
                 <button
                   type="button"
                   onClick={language === 'ar' ? handleNext : handlePrev}
@@ -337,7 +491,10 @@ export const StudentDataModal: React.FC<StudentDataModalProps> = ({
               </div>
             )}
             <button
-              onClick={onClose}
+              onClick={async () => {
+                await handleFlushSave();
+                onClose();
+              }}
               className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200/60 dark:hover:bg-gray-700 rounded-xl transition"
             >
               <XMarkIcon />
@@ -359,7 +516,8 @@ export const StudentDataModal: React.FC<StudentDataModalProps> = ({
                 <input
                   type="text"
                   value={nomEleve}
-                  onChange={(e) => { setNomEleve(e.target.value); setSaveSuccess(false); }}
+                  onChange={(e) => handleNomChange(e.target.value)}
+                  onBlur={handleFlushSave}
                   className="w-full text-xs font-bold px-3 py-2 rounded-lg border border-gray-300 dark:bg-gray-800 dark:border-gray-650 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
                 />
               </div>
@@ -370,7 +528,8 @@ export const StudentDataModal: React.FC<StudentDataModalProps> = ({
                 <input
                   type="text"
                   value={currentNumeroEleve}
-                  onChange={(e) => { setCurrentNumeroEleve(e.target.value); setSaveSuccess(false); }}
+                  onChange={(e) => handleNumeroChange(e.target.value)}
+                  onBlur={handleFlushSave}
                   className="w-full text-xs font-mono font-bold px-3 py-2 rounded-lg border border-gray-300 dark:bg-gray-800 dark:border-gray-650 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
                 />
               </div>
@@ -381,7 +540,7 @@ export const StudentDataModal: React.FC<StudentDataModalProps> = ({
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => { setSexe('M'); setSaveSuccess(false); }}
+                    onClick={() => handleSexeChange('M')}
                     className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition ${
                       sexe === 'M'
                         ? 'bg-blue-600 text-white'
@@ -392,7 +551,7 @@ export const StudentDataModal: React.FC<StudentDataModalProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setSexe('F'); setSaveSuccess(false); }}
+                    onClick={() => handleSexeChange('F')}
                     className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition ${
                       sexe === 'F'
                         ? 'bg-pink-600 text-white'
@@ -466,6 +625,7 @@ export const StudentDataModal: React.FC<StudentDataModalProps> = ({
                         placeholder=""
                         value={formData.taille || ''}
                         onChange={(e) => handleFieldChange('taille', e.target.value)}
+                        onBlur={handleFlushSave}
                         className="w-full text-lg font-black text-center px-3 py-2 rounded-xl border border-gray-300 dark:bg-gray-800 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                       />
                     </div>
@@ -487,6 +647,7 @@ export const StudentDataModal: React.FC<StudentDataModalProps> = ({
                         placeholder=""
                         value={formData.poids || ''}
                         onChange={(e) => handleFieldChange('poids', e.target.value)}
+                        onBlur={handleFlushSave}
                         className="w-full text-lg font-black text-center px-3 py-2 rounded-xl border border-gray-300 dark:bg-gray-800 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                       />
                     </div>
@@ -508,6 +669,7 @@ export const StudentDataModal: React.FC<StudentDataModalProps> = ({
                         placeholder=""
                         value={formData.frequenceCardiaque || ''}
                         onChange={(e) => handleFieldChange('frequenceCardiaque', e.target.value)}
+                        onBlur={handleFlushSave}
                         className="w-full text-lg font-black text-center px-3 py-2 rounded-xl border border-gray-300 dark:bg-gray-800 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                       />
                     </div>
@@ -565,6 +727,7 @@ export const StudentDataModal: React.FC<StudentDataModalProps> = ({
                         placeholder=""
                         value={formData.vma || ''}
                         onChange={(e) => handleFieldChange('vma', e.target.value)}
+                        onBlur={handleFlushSave}
                         className="w-full text-lg font-black text-center px-3 py-2 rounded-xl border-2 border-amber-300 dark:border-amber-700 bg-white dark:bg-gray-800 text-amber-700 dark:text-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono shadow-xs"
                       />
                     </div>
@@ -583,6 +746,7 @@ export const StudentDataModal: React.FC<StudentDataModalProps> = ({
                         placeholder=""
                         value={formData.vitesse30m || ''}
                         onChange={(e) => handleFieldChange('vitesse30m', e.target.value)}
+                        onBlur={handleFlushSave}
                         className="w-full text-base font-bold text-center px-3 py-2 rounded-xl border border-gray-300 dark:bg-gray-800 dark:border-gray-600 focus:ring-1 focus:ring-indigo-500 font-mono"
                       />
                     </div>
@@ -601,6 +765,7 @@ export const StudentDataModal: React.FC<StudentDataModalProps> = ({
                         placeholder=""
                         value={formData.sautHorizontal || ''}
                         onChange={(e) => handleFieldChange('sautHorizontal', e.target.value)}
+                        onBlur={handleFlushSave}
                         className="w-full text-base font-bold text-center px-3 py-2 rounded-xl border border-gray-300 dark:bg-gray-800 dark:border-gray-600 focus:ring-1 focus:ring-indigo-500 font-mono"
                       />
                     </div>
@@ -619,6 +784,7 @@ export const StudentDataModal: React.FC<StudentDataModalProps> = ({
                         placeholder=""
                         value={formData.sautVertical || ''}
                         onChange={(e) => handleFieldChange('sautVertical', e.target.value)}
+                        onBlur={handleFlushSave}
                         className="w-full text-base font-bold text-center px-3 py-2 rounded-xl border border-gray-300 dark:bg-gray-800 dark:border-gray-600 focus:ring-1 focus:ring-indigo-500 font-mono"
                       />
                     </div>
@@ -637,6 +803,7 @@ export const StudentDataModal: React.FC<StudentDataModalProps> = ({
                         placeholder=""
                         value={formData.lancerMedball || ''}
                         onChange={(e) => handleFieldChange('lancerMedball', e.target.value)}
+                        onBlur={handleFlushSave}
                         className="w-full text-base font-bold text-center px-3 py-2 rounded-xl border border-gray-300 dark:bg-gray-800 dark:border-gray-600 focus:ring-1 focus:ring-indigo-500 font-mono"
                       />
                     </div>
@@ -655,6 +822,7 @@ export const StudentDataModal: React.FC<StudentDataModalProps> = ({
                         placeholder=""
                         value={formData.souplesseAssis || ''}
                         onChange={(e) => handleFieldChange('souplesseAssis', e.target.value)}
+                        onBlur={handleFlushSave}
                         className="w-full text-base font-bold text-center px-3 py-2 rounded-xl border border-gray-300 dark:bg-gray-800 dark:border-gray-600 focus:ring-1 focus:ring-indigo-500 font-mono"
                       />
                     </div>
@@ -673,6 +841,7 @@ export const StudentDataModal: React.FC<StudentDataModalProps> = ({
                         placeholder=""
                         value={formData.equilibreStatique || ''}
                         onChange={(e) => handleFieldChange('equilibreStatique', e.target.value)}
+                        onBlur={handleFlushSave}
                         className="w-full text-base font-bold text-center px-3 py-2 rounded-xl border border-gray-300 dark:bg-gray-800 dark:border-gray-600 focus:ring-1 focus:ring-indigo-500 font-mono"
                       />
                     </div>
@@ -719,7 +888,7 @@ export const StudentDataModal: React.FC<StudentDataModalProps> = ({
               className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/20 transition"
             >
               <SaveIcon />
-              <span>{language === 'ar' ? 'حفظ التعديلات' : 'Enregistrer'}</span>
+              <span>{autoSaveStatus === 'saved' ? (language === 'ar' ? 'تم الحفظ تلقائياً ✓' : 'Enregistré ✓') : (language === 'ar' ? 'حفظ التعديلات' : 'Enregistrer')}</span>
             </button>
           </div>
         </div>

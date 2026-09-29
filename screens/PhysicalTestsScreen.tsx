@@ -186,11 +186,62 @@ export const PhysicalTestsScreen: React.FC<PhysicalTestsScreenProps> = ({
         }
     };
 
-    const handleInputChange = (field: keyof PhysicalTests, value: string) => {
-        setFormData(prev => ({
-            ...prev,
-            [field]: value === '' ? undefined : Number(value)
-        }));
+    const handleInputChange = async (field: keyof PhysicalTests, value: string) => {
+        const numVal = value === '' ? undefined : Number(value);
+        const nextForm = {
+            ...formData,
+            [field]: numVal
+        };
+        setFormData(nextForm);
+
+        if (!selectedStudent) return;
+        let newResults = [...results];
+        const index = newResults.findIndex(r => r.numeroEleve === selectedStudent.numeroEleve);
+        const updatedItem = {
+            ...nextForm,
+            numeroEleve: selectedStudent.numeroEleve,
+            nomEleve: selectedStudent.nomEleve,
+            sexe: selectedStudent.sexe,
+            date: nextForm.date || sessionDate || new Date().toISOString()
+        } as PhysicalTests;
+
+        if (index >= 0) {
+            newResults[index] = updatedItem;
+        } else {
+            newResults.push(updatedItem);
+        }
+        
+        setResults(newResults);
+        await savePhysicalTests(selectedClass, newResults);
+        window.dispatchEvent(new CustomEvent('dbUpdated'));
+
+        // Also sync VMA to vmaResults if entered
+        if (field === 'vma' && numVal !== undefined && !isNaN(numVal)) {
+            const currentVmaList = await getVmaResults(selectedClass);
+            let updatedVmaList = [...currentVmaList];
+            const vmaIdx = updatedVmaList.findIndex(v => v.numeroEleve === selectedStudent.numeroEleve);
+            const levelInfo = findClosestPalier(numVal);
+
+            const vmaItem: StudentResult = {
+                id: vmaIdx >= 0 ? updatedVmaList[vmaIdx].id : Date.now(),
+                numeroEleve: selectedStudent.numeroEleve,
+                nomEleve: selectedStudent.nomEleve,
+                sexe: selectedStudent.sexe,
+                palierAtteint: levelInfo.palier,
+                vitesseMoyenne: levelInfo.vitesse,
+                vma: numVal,
+                date: updatedItem.date
+            };
+
+            if (vmaIdx >= 0) {
+                updatedVmaList[vmaIdx] = vmaItem;
+            } else {
+                updatedVmaList.push(vmaItem);
+            }
+
+            await saveVmaResults(selectedClass, updatedVmaList);
+            setVmaResults(updatedVmaList);
+        }
     };
 
     const handleSave = async () => {
@@ -597,6 +648,12 @@ export const PhysicalTestsScreen: React.FC<PhysicalTestsScreenProps> = ({
                             <Squares2X2Icon className="w-4 h-4" />
                             <span>بطاقات فردية</span>
                         </button>
+                    </div>
+
+                    {/* Auto-Save Live Status Badge */}
+                    <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-xs font-bold text-emerald-700 dark:text-emerald-300 shadow-xs">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <span>حفظ تلقائي مفعّل ✓</span>
                     </div>
 
                     {/* Field Test & Export Action Buttons */}
