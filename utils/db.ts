@@ -365,9 +365,9 @@ export const saveCompleteStudentData = async (
     const physicalList = await getPhysicalTests(className);
     const physIdx = physicalList.findIndex(p => p.numeroEleve === oldNumeroEleve);
     const mergedPhysical: PhysicalTests = {
+        date: new Date().toISOString(),
         ...(physIdx >= 0 ? physicalList[physIdx] : {}),
         ...physicalUpdates,
-        className,
         numeroEleve: studentIdentity.numeroEleve,
         nomEleve: studentIdentity.nomEleve,
         sexe: studentIdentity.sexe,
@@ -387,7 +387,10 @@ export const saveCompleteStudentData = async (
         const vmaIdx = vmaList.findIndex(v => v.numeroEleve === oldNumeroEleve);
         const existingPalier = (vmaIdx >= 0 && vmaList[vmaIdx].palierAtteint) ? vmaList[vmaIdx].palierAtteint : Math.max(1, Math.round((vmaVal - 8.5) / 0.5) + 1);
         const updatedVma: StudentResult = {
-            ...(vmaIdx >= 0 ? vmaList[vmaIdx] : { palierAtteint: existingPalier }),
+            id: vmaIdx >= 0 ? vmaList[vmaIdx].id : Date.now(),
+            date: vmaIdx >= 0 ? vmaList[vmaIdx].date : new Date().toISOString(),
+            vitesseMoyenne: vmaVal,
+            ...(vmaIdx >= 0 ? vmaList[vmaIdx] : {}),
             numeroEleve: studentIdentity.numeroEleve,
             nomEleve: studentIdentity.nomEleve,
             sexe: studentIdentity.sexe,

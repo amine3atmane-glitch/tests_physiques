@@ -62,7 +62,7 @@ export const ImportExportScreen: React.FC<ImportExportScreenProps> = ({
     setSelectedClass,
     groupSize
 }) => {
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
     const [classList, setClassList] = useState<string[]>([]);
 
     // Feedback notifications
@@ -332,10 +332,10 @@ export const ImportExportScreen: React.FC<ImportExportScreenProps> = ({
             "الجنس": tItem.sexe || '',
             "VMA (كم/س)": tItem.vma ?? '',
             "30 م سرعة (ث)": tItem.vitesse30m !== undefined ? Number(tItem.vitesse30m).toFixed(2) : '',
-            "رمي الجلة (م)": tItem.lancerPoids ?? '',
+            "رمي الكرة الطبية (م)": tItem.lancerMedball ?? '',
             "القفز الأفقي (م)": tItem.sautHorizontal ?? '',
             "القفز العمودي (سم)": tItem.sautVertical ?? '',
-            "المرونة (سم)": tItem.souplesse ?? '',
+            "المرونة (سم)": tItem.souplesseAssis ?? tItem.souplesseDebout ?? '',
             "الوزن (كغ)": tItem.poids ?? '',
             "الطول (سم)": tItem.taille ?? '',
             "دقات القلب (bpm)": tItem.frequenceCardiaque ?? '',

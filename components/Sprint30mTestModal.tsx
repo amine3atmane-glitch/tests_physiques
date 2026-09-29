@@ -513,23 +513,23 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200">
       <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl border border-gray-100 dark:border-gray-700 w-full max-w-5xl max-h-[95vh] flex flex-col overflow-hidden">
         
-        {/* Header */}
-        <div className="px-5 py-4 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 text-white flex items-center justify-between shrink-0 shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-white/10 rounded-2xl backdrop-blur-md">
-              <TrophyIcon className="w-6 h-6 text-amber-200" />
+        {/* Header - Compact & Clean without Description */}
+        <div className="px-3.5 sm:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 text-white flex items-center justify-between shrink-0 shadow-sm">
+          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 bg-white/15 rounded-xl flex items-center justify-center shrink-0">
+              <TrophyIcon className="w-4 h-4 sm:w-5 sm:h-5 text-amber-200" />
             </div>
-            <div>
-              <h2 className="text-lg sm:text-xl font-black">اختبار 30 م سرعة (سباق السرعة)</h2>
-              <p className="text-xs text-amber-100/90 font-medium">تسجيل توقيت الوصول مباشرة عند خط النهاية ثم إدخال اسم أو رقم التلميذ بعد الاختبار</p>
-            </div>
+            <h2 className="text-sm sm:text-base font-black truncate">
+              اختبار 30 م سرعة
+            </h2>
           </div>
 
           <button
             onClick={onClose}
-            className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition cursor-pointer"
+            className="p-1.5 text-white/80 hover:text-white hover:bg-white/15 rounded-xl transition cursor-pointer shrink-0"
+            aria-label="إغلاق"
           >
-            <XMarkIcon className="w-6 h-6" />
+            <XMarkIcon className="w-5 h-5" />
           </button>
         </div>
 

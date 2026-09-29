@@ -42,7 +42,7 @@ export const BiometricMeasurementsScreen: React.FC<BiometricMeasurementsScreenPr
     setSelectedClass,
     sessionDate
 }) => {
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
     const [classList, setClassList] = useState<string[]>([]);
     const [studentList, setStudentList] = useState<StudentIdentity[]>([]);
     const [testsData, setTestsData] = useState<PhysicalTests[]>([]);
