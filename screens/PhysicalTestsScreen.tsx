@@ -13,10 +13,12 @@ import {
     PencilSquareIcon,
     RunningManIcon,
     TableCellsIcon,
-    Squares2X2Icon
+    Squares2X2Icon,
+    BalanceIcon
 } from '../components/Icons';
 import { StudentDataModal } from '../components/StudentDataModal';
 import { Sprint30mTestModal } from '../components/Sprint30mTestModal';
+import { StaticBalanceTestModal } from '../components/StaticBalanceTestModal';
 import { parsePhysicalTestsExcel, downloadPhysicalTestsTemplate, ParsedPhysicalTestsData } from '../utils/excelHelper';
 import { LUC_LEGER_DATA } from '../constants';
 import { VmaTestScreen } from './VmaTestScreen';
@@ -63,6 +65,7 @@ export const PhysicalTestsScreen: React.FC<PhysicalTestsScreenProps> = ({
     const [modalStudentNumber, setModalStudentNumber] = useState<string | null>(null);
     const [isLucLegerModalOpen, setIsLucLegerModalOpen] = useState(false);
     const [isSprintModalOpen, setIsSprintModalOpen] = useState(false);
+    const [isBalanceModalOpen, setIsBalanceModalOpen] = useState(false);
     
     // Import state
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -665,6 +668,15 @@ export const PhysicalTestsScreen: React.FC<PhysicalTestsScreenProps> = ({
                         >
                             <RunningManIcon className="w-4 h-4 shrink-0 text-orange-200" />
                             <span>اختبار 30 م سرعة</span>
+                        </button>
+
+                        <button
+                            onClick={() => setIsBalanceModalOpen(true)}
+                            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl shadow-xs text-white bg-teal-600 hover:bg-teal-700 transition active:scale-95 cursor-pointer"
+                            title="تنظيم اختبار التوازن الثابت لـ 1 أو 2 أو 3 أو 4 تلاميذ مع إطلاق العداد وتسجيل توقيت انسحاب/سقوط كل تلميذ"
+                        >
+                            <BalanceIcon className="w-4 h-4 shrink-0 text-teal-200" />
+                            <span>اختبار التوازن الثابت</span>
                         </button>
 
                         <button
@@ -1458,6 +1470,16 @@ export const PhysicalTestsScreen: React.FC<PhysicalTestsScreenProps> = ({
                 <Sprint30mTestModal
                     isOpen={isSprintModalOpen}
                     onClose={() => setIsSprintModalOpen(false)}
+                    initialClass={selectedClass}
+                    classList={classList}
+                    onDataSaved={() => loadClassData(selectedClass)}
+                />
+            )}
+
+            {isBalanceModalOpen && (
+                <StaticBalanceTestModal
+                    isOpen={isBalanceModalOpen}
+                    onClose={() => setIsBalanceModalOpen(false)}
                     initialClass={selectedClass}
                     classList={classList}
                     onDataSaved={() => loadClassData(selectedClass)}

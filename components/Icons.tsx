@@ -267,3 +267,15 @@ export const UserPlusIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+export const BalanceIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+    {/* Stork / Flamant Rose Balance Position */}
+    <circle cx="12" cy="4" r="2" />
+    <path d="M12 6v7" />
+    <path d="M12 13l-2.5 8" />
+    <path d="M12 13l3.5-3 2.5 3" />
+    <path d="M6 10l6 1 6-1" />
+  </svg>
+);
+
+
