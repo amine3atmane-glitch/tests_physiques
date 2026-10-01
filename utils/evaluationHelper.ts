@@ -121,6 +121,54 @@ export const TEST_SPORT_RECOMMENDATIONS: Record<string, SportRecommendation> = {
     talentTitleFr: 'Équilibre d\'Acier & Concentration ⚖️',
     icon: '⚖️',
     descriptionAr: 'قدرة فائقة على الثبات العصبي العضلي والتحكم في مركز ثقل الجسم تحت الضغوط الحركية.'
+  },
+  taille: {
+    categoryAr: 'طول القامة والمدى الأنثروبومتري (Taille)',
+    categoryFr: 'Taille & Stature Anthropométrique',
+    primaryQualityAr: 'طول القامة والمدى الحركي للذراعين والارتقاء',
+    primaryQualityFr: 'Grande Stature & Envergure',
+    recommendedSportsAr: ['كرة السلة (لاعب ارتكاز/صانع ألعاب)', 'كرة الطائرة (الكبس والصد)', 'كرة اليد (الظهير)', 'ألعاب القوى (القفز العالي وسباق الحواجز)', 'التجديف والسباحة'],
+    recommendedSportsFr: ['Basketball', 'Volleyball', 'Handball', 'Saut en Hauteur & Haies', 'Aviron & Natation'],
+    talentTitleAr: 'قامة أنثروبومترية رياضية ممتازة 📏',
+    talentTitleFr: 'Stature Anthropométrique Exceptionnelle 📏',
+    icon: '📏',
+    descriptionAr: 'تمتلك هذه القامة المتميزة أفضلية كبيرة في الرياضات القائمة على الارتفاع والمدى الحركي وتغطية المساحات الهوائية والأرضية.'
+  },
+  poids: {
+    categoryAr: 'الوزن والكتلة البدنية (Poids)',
+    categoryFr: 'Poids & Masse Corporelle',
+    primaryQualityAr: 'كتلة بدنية متوازنة وتوليد القوة',
+    primaryQualityFr: 'Masse Musculaire & Génération de Puissance',
+    recommendedSportsAr: ['ألعاب القوى (مسابقات الرمي والركض)', 'الفنون القتالية والجودو', 'الرغبي', 'رفع الأثقال'],
+    recommendedSportsFr: ['Athlétisme', 'Sports de Combat & Judo', 'Rugby', 'Haltérophilie'],
+    talentTitleAr: 'بنية جيدة وتقسيم متوازن ⚖️',
+    talentTitleFr: 'Structure Équilibrée ⚖️',
+    icon: '⚖️',
+    descriptionAr: 'تساعد الكتلة المتوازنة في توليد القوة والاحتفاظ بالثبات البدني أثناء الصراعات الثنائية والمهارات المركبة.'
+  },
+  imc: {
+    categoryAr: 'مؤشر التناسق البدني (IMC)',
+    categoryFr: 'Composition Corporelle & Indice IMC',
+    primaryQualityAr: 'التناسق البدني والنسبة المثالية بين الطول والوزن',
+    primaryQualityFr: 'Rapport Poids/Taille Optimal & Composition Corporelle',
+    recommendedSportsAr: ['الجمباز الفني والإيقاعي', 'ألعاب القوى (الركض والقفز)', 'كرة القدم (الأجنحة ووسط الميدان)', 'التعبير الجسدي والتسلق'],
+    recommendedSportsFr: ['Gymnastique', 'Athlétisme', 'Football', 'Escalade'],
+    talentTitleAr: 'تناسق بدني ورشاقة عالية 📊',
+    talentTitleFr: 'Physique Idéal & Harmonie 📊',
+    icon: '📊',
+    descriptionAr: 'تناسق بدني ممتاز يقلل من العبء الميت أثناء الحركة ويسمح بأقصى قدرة على المناورة والسرعة والرشاقة.'
+  },
+  frequenceCardiaque: {
+    categoryAr: 'كفاءة الجهاز الدوري التنفسي (نبض الراحة FC)',
+    categoryFr: 'Fréquence Cardiaque de Repos (FC)',
+    primaryQualityAr: 'كفاءة العضلة القلبية والتباطؤ الرياضي القلبي',
+    primaryQualityFr: 'Efficacité Cardiaque & Bradycardie Sportive',
+    recommendedSportsAr: ['ألعاب القوى (سباقات التحمل والماراثون)', 'سباق الدراجات الهوائية', 'السباحة والسباق الثلاثي', 'التزلج والتجديف'],
+    recommendedSportsFr: ['Athlétisme (Demi-fond & Fond)', 'Cyclisme', 'Natation & Triathlon', 'Aviron'],
+    talentTitleAr: 'قلب رياضي عالي الكفاءة والتحمل ❤️',
+    talentTitleFr: 'Cœur d\'Athlète Ultra-Efficient ❤️',
+    icon: '❤️',
+    descriptionAr: 'انخفاض معدل نبض الراحة يدل على كفاءة عالية لضخ الدم في العضلة القلبية، مما يمنح التلميذ قدرة استثنائية على التحمل والاسترجاع.'
   }
 };
 
@@ -213,6 +261,43 @@ export function evaluateTestPerformance(
       else if (value >= thresholds[1]) rating = 'very_good';
       else if (value >= thresholds[2]) rating = 'good';
       else if (value >= thresholds[3]) rating = 'average';
+      else rating = 'needs_improvement';
+      break;
+    }
+    case 'taille': {
+      // Height in cm
+      const thresholds = gender === 'M' ? [175, 168, 160, 150] : [168, 160, 153, 145];
+      if (value >= thresholds[0]) rating = 'excellent';
+      else if (value >= thresholds[1]) rating = 'very_good';
+      else if (value >= thresholds[2]) rating = 'good';
+      else if (value >= thresholds[3]) rating = 'average';
+      else rating = 'needs_improvement';
+      break;
+    }
+    case 'poids': {
+      // Weight in kg
+      if (value >= 50 && value <= 70) rating = 'excellent';
+      else if ((value >= 45 && value < 50) || (value > 70 && value <= 78)) rating = 'very_good';
+      else if ((value >= 40 && value < 45) || (value > 78 && value <= 85)) rating = 'good';
+      else if ((value >= 35 && value < 40) || (value > 85 && value <= 95)) rating = 'average';
+      else rating = 'needs_improvement';
+      break;
+    }
+    case 'imc': {
+      // BMI in kg/m²
+      if (value >= 18.5 && value <= 23.5) rating = 'excellent';
+      else if ((value >= 17.5 && value < 18.5) || (value > 23.5 && value <= 24.9)) rating = 'very_good';
+      else if ((value >= 16.5 && value < 17.5) || (value > 24.9 && value <= 27)) rating = 'good';
+      else if ((value >= 15.5 && value < 16.5) || (value > 27 && value <= 30)) rating = 'average';
+      else rating = 'needs_improvement';
+      break;
+    }
+    case 'frequenceCardiaque': {
+      // Resting Heart Rate in bpm (Lower is better for cardiac capacity)
+      if (value <= 60) rating = 'excellent';
+      else if (value <= 68) rating = 'very_good';
+      else if (value <= 76) rating = 'good';
+      else if (value <= 84) rating = 'average';
       else rating = 'needs_improvement';
       break;
     }
