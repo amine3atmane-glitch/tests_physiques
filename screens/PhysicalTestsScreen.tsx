@@ -19,6 +19,7 @@ import {
 import { StudentDataModal } from '../components/StudentDataModal';
 import { Sprint30mTestModal } from '../components/Sprint30mTestModal';
 import { StaticBalanceTestModal } from '../components/StaticBalanceTestModal';
+import { VisualScaleTestModal, ScaleTestField } from '../components/VisualScaleTestModal';
 import { parsePhysicalTestsExcel, downloadPhysicalTestsTemplate, ParsedPhysicalTestsData } from '../utils/excelHelper';
 import { LUC_LEGER_DATA } from '../constants';
 import { VmaTestScreen } from './VmaTestScreen';
@@ -66,6 +67,7 @@ export const PhysicalTestsScreen: React.FC<PhysicalTestsScreenProps> = ({
     const [isLucLegerModalOpen, setIsLucLegerModalOpen] = useState(false);
     const [isSprintModalOpen, setIsSprintModalOpen] = useState(false);
     const [isBalanceModalOpen, setIsBalanceModalOpen] = useState(false);
+    const [activeScaleTest, setActiveScaleTest] = useState<ScaleTestField | null>(null);
     
     // Import state
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -686,6 +688,51 @@ export const PhysicalTestsScreen: React.FC<PhysicalTestsScreenProps> = ({
                         >
                             <RunningManIcon className="w-4 h-4 shrink-0" />
                             <span>اختبار Luc Léger</span>
+                        </button>
+
+                        <button
+                            onClick={() => setActiveScaleTest('sautVertical')}
+                            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl shadow-xs text-white bg-purple-600 hover:bg-purple-700 transition active:scale-95 cursor-pointer"
+                            title="اختبار القفز العمودي سارجنت بواسطة مدرج تفاعلي"
+                        >
+                            <span>🚀</span>
+                            <span>قفز عمودي</span>
+                        </button>
+
+                        <button
+                            onClick={() => setActiveScaleTest('sautHorizontal')}
+                            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl shadow-xs text-white bg-blue-600 hover:bg-blue-700 transition active:scale-95 cursor-pointer"
+                            title="اختبار القفز الأفقي بواسطة مدرج أفقي"
+                        >
+                            <span>📐</span>
+                            <span>قفز أفقي</span>
+                        </button>
+
+                        <button
+                            onClick={() => setActiveScaleTest('lancerMedball')}
+                            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl shadow-xs text-white bg-orange-700 hover:bg-orange-800 transition active:scale-95 cursor-pointer"
+                            title="اختبار رمي الكرة الطبية بواسطة مدرج مسافة"
+                        >
+                            <span>💥</span>
+                            <span>رمي الكرة</span>
+                        </button>
+
+                        <button
+                            onClick={() => setActiveScaleTest('souplesseAssis')}
+                            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl shadow-xs text-white bg-emerald-600 hover:bg-emerald-700 transition active:scale-95 cursor-pointer"
+                            title="اختبار مرونة الجذع من الجلوس بواسطة مدرج مرونة"
+                        >
+                            <span>🧘</span>
+                            <span>مرونة جلوس</span>
+                        </button>
+
+                        <button
+                            onClick={() => setActiveScaleTest('souplesseDebout')}
+                            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl shadow-xs text-white bg-cyan-600 hover:bg-cyan-700 transition active:scale-95 cursor-pointer"
+                            title="اختبار مرونة الجذع من الوقوف بواسطة مدرج مرونة"
+                        >
+                            <span>🧘‍♂️</span>
+                            <span>مرونة وقوف</span>
                         </button>
 
                         <button
@@ -1480,6 +1527,17 @@ export const PhysicalTestsScreen: React.FC<PhysicalTestsScreenProps> = ({
                 <StaticBalanceTestModal
                     isOpen={isBalanceModalOpen}
                     onClose={() => setIsBalanceModalOpen(false)}
+                    initialClass={selectedClass}
+                    classList={classList}
+                    onDataSaved={() => loadClassData(selectedClass)}
+                />
+            )}
+
+            {activeScaleTest && (
+                <VisualScaleTestModal
+                    isOpen={!!activeScaleTest}
+                    onClose={() => setActiveScaleTest(null)}
+                    testField={activeScaleTest}
                     initialClass={selectedClass}
                     classList={classList}
                     onDataSaved={() => loadClassData(selectedClass)}

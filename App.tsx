@@ -3,6 +3,7 @@ import { Sidebar, ActiveScreen } from './components/Sidebar';
 import { TopHeader } from './components/TopHeader';
 import { PhysicalTestsScreen } from './screens/PhysicalTestsScreen';
 import { BiometricMeasurementsScreen } from './screens/BiometricMeasurementsScreen';
+import { ExploitationResultsScreen } from './screens/ExploitationResultsScreen';
 import { ClassesScreen } from './screens/ClassesScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { LanguageProvider, useLanguage } from './utils/i18n';
@@ -82,6 +83,13 @@ const MainLayout: React.FC = () => {
               selectedClass={selectedClass}
               setSelectedClass={setSelectedClass}
               sessionDate={sessionDate}
+            />
+          )}
+
+          {activeScreen === 'exploitation' && (
+            <ExploitationResultsScreen
+              selectedClass={selectedClass}
+              setSelectedClass={setSelectedClass}
             />
           )}
 

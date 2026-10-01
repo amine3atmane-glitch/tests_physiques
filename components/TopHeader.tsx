@@ -4,6 +4,7 @@ import { useLanguage } from '../utils/i18n';
 import type { ActiveScreen } from './Sidebar';
 import { getAllClasses, ClassStats } from '../utils/db';
 import { AboutModal } from './AboutModal';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface TopHeaderProps {
   activeScreen: ActiveScreen;
@@ -47,6 +48,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         return t.navPhysicalTests;
       case 'measurements':
         return t.navMeasurements;
+      case 'exploitation':
+        return language === 'ar' ? 'استغلال النتائج وتوجيه المواهب' : 'Exploitation des Résultats';
       case 'classes':
         return t.classesTitle;
       case 'settings':
@@ -110,6 +113,9 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             )}
           </div>
           
+          {/* PWA Install Button */}
+          <PWAInstallButton />
+
           {/* About App (حول التطبيق) Button */}
           <button
             type="button"

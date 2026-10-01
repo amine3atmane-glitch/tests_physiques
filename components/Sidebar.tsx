@@ -10,7 +10,8 @@ import {
     ChevronDoubleLeftIcon,
     ChevronDoubleRightIcon,
     GlobeAltIcon,
-    AcademicCapIcon
+    AcademicCapIcon,
+    TrophyIcon
 } from './Icons';
 import { useLanguage } from '../utils/i18n';
 import { getAllClasses, ClassStats } from '../utils/db';
@@ -19,6 +20,7 @@ import { usePWAInstall } from '../hooks/usePWAInstall';
 export type ActiveScreen = 
   | 'physical-tests' 
   | 'measurements' 
+  | 'exploitation'
   | 'classes'
   | 'settings';
 
@@ -87,6 +89,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: t.navMeasurements,
       icon: <RulerIcon className="w-5 h-5" />,
       badge: 'IMC'
+    },
+    {
+      id: 'exploitation' as ActiveScreen,
+      label: language === 'ar' ? 'استغلال النتائج' : 'Exploitation Résultats',
+      icon: <TrophyIcon className="w-5 h-5 text-amber-500" />,
+      badge: 'جديد'
     }
   ];
 
