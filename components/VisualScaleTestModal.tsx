@@ -361,6 +361,26 @@ export const VisualScaleTestModal: React.FC<VisualScaleTestModalProps> = ({
         {/* Modal Main Body */}
         <div className="p-3 sm:p-5 overflow-y-auto flex-1 space-y-4 custom-scrollbar">
 
+          {/* CLASS SELECTOR BAR (حقل القسم الحالي) */}
+          <div className="flex items-center justify-between gap-3 bg-indigo-50/80 dark:bg-gray-800/80 px-4 py-2.5 rounded-2xl border border-indigo-200 dark:border-gray-700 shadow-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-xs sm:text-sm font-extrabold text-indigo-900 dark:text-indigo-300">القسم الحالي:</span>
+              <select
+                value={selectedClass}
+                onChange={(e) => setSelectedClass(e.target.value)}
+                className="bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs sm:text-sm font-bold px-3 py-1.5 rounded-xl border border-indigo-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-2xs"
+              >
+                {classes.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="text-xs font-extrabold text-gray-600 dark:text-gray-300">
+              عدد تلاميذ القسم: <span className="text-indigo-600 dark:text-indigo-400 font-black">{students.length}</span>
+            </div>
+          </div>
+
           {/* PROMINENT ACTIVE STUDENT IDENTITY CARD BANNER */}
           {activeStudent && (
             <div className="bg-gradient-to-r from-amber-500/15 via-indigo-600/15 to-purple-600/15 dark:from-amber-950/40 dark:via-indigo-950/40 dark:to-purple-950/40 border-2 border-amber-400/60 dark:border-amber-500/40 p-4 rounded-2xl sm:rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md">
@@ -369,8 +389,13 @@ export const VisualScaleTestModal: React.FC<VisualScaleTestModalProps> = ({
                   #{activeStudentIndex >= 0 ? activeStudentIndex + 1 : 1}
                 </div>
                 <div>
-                  <div className="text-[10px] sm:text-xs font-extrabold text-amber-700 dark:text-amber-300 uppercase tracking-wider">
-                    {language === 'ar' ? 'التلميذ(ة) الجاري تقييم اختباره الآن:' : 'Élève en cours d\'évaluation:'}
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="px-2.5 py-0.5 rounded-lg bg-amber-500 text-gray-950 font-black text-xs shadow-xs border border-amber-300">
+                      القسم: {selectedClass}
+                    </span>
+                    <span className="text-[10px] sm:text-xs font-extrabold text-amber-700 dark:text-amber-300 uppercase tracking-wider">
+                      {language === 'ar' ? '• التلميذ(ة) الجاري تقييم اختباره:' : '• Élève évalué:'}
+                    </span>
                   </div>
                   <div className="text-xl sm:text-3xl font-black text-gray-900 dark:text-amber-200 tracking-wide">
                     {activeStudent.nomEleve}
@@ -411,26 +436,6 @@ export const VisualScaleTestModal: React.FC<VisualScaleTestModalProps> = ({
               </div>
             </div>
           )}
-
-          {/* CLASS SELECTOR BAR */}
-          <div className="flex items-center justify-between gap-3 bg-gray-50 dark:bg-gray-800/60 px-4 py-2 rounded-2xl border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-gray-500 dark:text-gray-400">القسم الحالي:</span>
-              <select
-                value={selectedClass}
-                onChange={(e) => setSelectedClass(e.target.value)}
-                className="bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs sm:text-sm font-bold px-3 py-1.5 rounded-xl border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-              >
-                {classes.map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="text-xs font-extrabold text-gray-500 dark:text-gray-400">
-              عدد تلاميذ القسم: <span className="text-indigo-600 dark:text-indigo-400">{students.length}</span>
-            </div>
-          </div>
 
           {/* INTERACTIVE RULER / SCALE & VALUE ADJUSTER */}
           <div className="bg-gradient-to-br from-gray-900 via-slate-900 to-indigo-950 text-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl shadow-xl border border-indigo-500/30 flex flex-col items-center gap-4">
@@ -613,6 +618,7 @@ export const VisualScaleTestModal: React.FC<VisualScaleTestModalProps> = ({
                 <thead className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 sticky top-0 font-bold border-b border-gray-200 dark:border-gray-700">
                   <tr>
                     <th className="p-2 text-center w-12">#</th>
+                    <th className="p-2 text-center w-20">القسم</th>
                     <th className="p-2 text-start">اسم التلميذ(ة)</th>
                     <th className="p-2 text-center w-16">الجنس</th>
                     <th className="p-2 text-center w-28">النتيجة ({config.unitAr})</th>
@@ -623,7 +629,7 @@ export const VisualScaleTestModal: React.FC<VisualScaleTestModalProps> = ({
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {filteredStudents.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="p-4 text-center text-gray-400 font-bold">
+                      <td colSpan={7} className="p-4 text-center text-gray-400 font-bold">
                         لا توجد نتائج مطابقة للبحث
                       </td>
                     </tr>
@@ -648,6 +654,11 @@ export const VisualScaleTestModal: React.FC<VisualScaleTestModalProps> = ({
                         >
                           <td className="p-2 text-center font-mono font-bold text-gray-500">
                             #{orderNum}
+                          </td>
+                          <td className="p-2 text-center">
+                            <span className="px-2 py-0.5 rounded-lg bg-indigo-100 dark:bg-indigo-950/80 text-indigo-800 dark:text-indigo-300 text-[10px] font-extrabold border border-indigo-200 dark:border-indigo-800">
+                              {selectedClass}
+                            </span>
                           </td>
                           <td className="p-2 font-black text-sm text-gray-900 dark:text-white">
                             {student.nomEleve}

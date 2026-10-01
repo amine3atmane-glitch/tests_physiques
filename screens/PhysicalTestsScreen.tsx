@@ -1075,6 +1075,9 @@ export const PhysicalTestsScreen: React.FC<PhysicalTestsScreenProps> = ({
                                                 #{student.orderIndex}
                                             </span>
                                             <div className="truncate">
+                                                <div className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 mb-0.5">
+                                                    القسم: {selectedClass}
+                                                </div>
                                                 <div className="font-bold text-sm text-gray-800 dark:text-gray-100 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 flex items-center gap-1.5">
                                                     <span>{student.nomEleve}</span>
                                                 </div>
@@ -1150,6 +1153,12 @@ export const PhysicalTestsScreen: React.FC<PhysicalTestsScreenProps> = ({
                                 {/* Student Header */}
                                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
                                     <div>
+                                        <div className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mb-1 flex items-center gap-2">
+                                            <span className="px-2.5 py-0.5 rounded-lg bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300 font-black border border-indigo-200 dark:border-indigo-800">
+                                                القسم: {selectedClass}
+                                            </span>
+                                            <span>#{selectedStudent.orderIndex}</span>
+                                        </div>
                                         <div 
                                             className="flex items-center gap-2 cursor-pointer group"
                                             onClick={() => setModalStudentNumber(selectedStudent.numeroEleve)}

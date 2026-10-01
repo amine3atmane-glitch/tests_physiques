@@ -724,8 +724,8 @@ export const StaticBalanceTestModal: React.FC<StaticBalanceTestModalProps> = ({
                         {assignedStudent ? (
                           <div className="flex items-center justify-between gap-1 p-1.5 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600">
                             <div className="truncate min-w-0">
-                              <div className="text-[10px] font-mono font-bold text-gray-400">
-                                #{assignedStudent.orderIndex || assignedStudent.numeroEleve}
+                              <div className="text-[10px] font-bold text-teal-700 dark:text-teal-400">
+                                القسم: {selectedClass} • #{assignedStudent.orderIndex || assignedStudent.numeroEleve}
                               </div>
                               <div className="text-xs font-black text-gray-900 dark:text-white truncate">
                                 {assignedStudent.nomEleve}
@@ -904,13 +904,16 @@ export const StaticBalanceTestModal: React.FC<StaticBalanceTestModalProps> = ({
                             : 'bg-gray-50 dark:bg-gray-800/80 border-gray-200 dark:border-gray-700 hover:border-teal-400 hover:bg-teal-50/30'
                         }`}
                       >
-                        {/* Student Order Number Badge & Name */}
-                        <div className="flex items-center gap-2.5 truncate min-w-0 flex-1">
+                        {/* Student Order Number, Class & Name */}
+                        <div className="flex items-center gap-2 truncate min-w-0 flex-1">
                           <span className="shrink-0 w-8 h-8 rounded-xl bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300 font-mono font-black text-xs flex items-center justify-center border border-teal-200/80 dark:border-teal-800/80">
                             #{displayOrderNumber}
                           </span>
 
                           <div className="truncate min-w-0 flex-1">
+                            <div className="text-[10px] font-black text-teal-700 dark:text-teal-400">
+                              القسم: {selectedClass}
+                            </div>
                             <div className="font-bold text-xs sm:text-sm text-gray-900 dark:text-white truncate">
                               {student.nomEleve}
                             </div>
@@ -1009,11 +1012,14 @@ export const StaticBalanceTestModal: React.FC<StaticBalanceTestModalProps> = ({
                             {index + 1}
                           </span>
                           <div>
+                            <div className="text-[10px] font-bold text-teal-700 dark:text-teal-400">
+                              القسم: {selectedClass} • #{item.orderIndex || item.numeroEleve}
+                            </div>
                             <div className="font-bold text-xs sm:text-sm text-gray-900 dark:text-white">
                               {item.nomEleve}
                             </div>
                             <div className="text-[10px] text-gray-500">
-                              #{item.orderIndex || item.numeroEleve} • {item.sexe === 'F' ? 'أنثى' : 'ذكر'}
+                              الجنس: {item.sexe === 'F' ? 'أنثى' : 'ذكر'}
                             </div>
                           </div>
                         </div>

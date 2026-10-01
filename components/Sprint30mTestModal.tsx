@@ -842,8 +842,8 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
 
                             <div className="flex items-center justify-between gap-1">
                               <div className="truncate min-w-0">
-                                <div className="text-[10px] font-mono font-bold text-gray-400">
-                                  #{assignedStudent.orderIndex || (students.findIndex(s => s.numeroEleve === assignedStudent.numeroEleve) + 1)}
+                                <div className="text-[10px] font-bold text-amber-700 dark:text-amber-400">
+                                  القسم: {selectedClass} • #{assignedStudent.orderIndex || (students.findIndex(s => s.numeroEleve === assignedStudent.numeroEleve) + 1)}
                                 </div>
                                 <div className="text-[11px] sm:text-xs font-black text-gray-900 dark:text-white truncate">
                                   {assignedStudent.nomEleve}
@@ -1019,17 +1019,20 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
                             : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-amber-500 hover:bg-amber-50/50 dark:hover:bg-gray-750'
                         }`}
                       >
-                        {/* Right / Start: Order Number & Name */}
-                        <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
+                        {/* Right / Start: Order Number, Class & Name */}
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden">
                           <span className={`w-9 h-9 min-w-[36px] max-w-[36px] rounded-xl font-mono font-black text-xs flex items-center justify-center shrink-0 shadow-xs ${
                             isAssignedInCurrentRace
                               ? 'bg-emerald-600 text-white'
-                              : 'bg-gray-150 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
                           }`}>
                             #{displayOrderNumber}
                           </span>
 
                           <div className="min-w-0 flex-1 text-right overflow-hidden">
+                            <div className="text-[10px] font-black text-amber-700 dark:text-amber-400">
+                              القسم: {selectedClass}
+                            </div>
                             <div className="text-xs sm:text-sm font-black text-gray-900 dark:text-white truncate block">
                               {student.nomEleve}
                             </div>
@@ -1123,8 +1126,13 @@ export const Sprint30mTestModal: React.FC<Sprint30mTestModalProps> = ({
                               <td className="p-2 font-bold text-gray-600 dark:text-gray-400">
                                 {idx === 0 ? '🥇 1' : idx === 1 ? '🥈 2' : idx === 2 ? '🥉 3' : idx + 1}
                               </td>
-                              <td className="p-2 text-right font-bold text-gray-900 dark:text-white">
-                                {student.nomEleve}
+                              <td className="p-2 text-right">
+                                <div className="text-[10px] font-bold text-amber-700 dark:text-amber-400">
+                                  القسم: {selectedClass}
+                                </div>
+                                <div className="font-bold text-gray-900 dark:text-white">
+                                  {student.nomEleve}
+                                </div>
                               </td>
                               <td className="p-2">
                                 <span 
