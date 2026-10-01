@@ -19,15 +19,20 @@ export const playBeep = (audioContext: AudioContext | null) => {
     oscillator.connect(gainNode);
     gainNode.connect(audioContext.destination);
 
-    gainNode.gain.setValueAtTime(0.25, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+    // Optimized for Bluetooth speakers: Volume raised to 0.85 (instead of 0.25)
+    // and duration extended to 0.35 seconds so the wireless signal doesn't cut it off.
+    gainNode.gain.setValueAtTime(0.85, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.35);
     
-    oscillator.frequency.setValueAtTime(1000, audioContext.currentTime);
-    oscillator.type = 'sine';
+    // 1200Hz is highly piercing and clearer in open spaces / outdoors
+    oscillator.frequency.setValueAtTime(1200, audioContext.currentTime);
+    
+    // 'triangle' waveform produces richer, warmer harmonics that travel much better through Bluetooth audio compressors and small speakers than standard 'sine'
+    oscillator.type = 'triangle';
 
     const now = audioContext.currentTime;
     oscillator.start(now);
-    oscillator.stop(now + 0.2);
+    oscillator.stop(now + 0.35);
   } catch (err) {
     console.warn("AudioContext playBeep error:", err);
   }
