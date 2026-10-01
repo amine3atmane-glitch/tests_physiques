@@ -21,6 +21,8 @@ export const useLucLeger = (
   const timeRef = useRef<number>(0);
   const lastAnnouncedPalierRef = useRef<number>(0);
   const lastBeepSegmentIndexRef = useRef<number>(-1);
+  const keepAliveOscRef = useRef<OscillatorNode | null>(null);
+  const keepAliveGainRef = useRef<GainNode | null>(null);
 
   const currentLevelIndex = Math.floor(time / 60);
   const currentLevel: LucLegerLevel | null = LUC_LEGER_DATA[currentLevelIndex] || null;
@@ -56,6 +58,22 @@ export const useLucLeger = (
     window.addEventListener('dbUpdated', handleDbUpdate);
     return () => window.removeEventListener('dbUpdated', handleDbUpdate);
   }, [className]);
+
+  const stopKeepAlive = useCallback(() => {
+    try {
+      if (keepAliveOscRef.current) {
+        keepAliveOscRef.current.stop();
+        keepAliveOscRef.current.disconnect();
+        keepAliveOscRef.current = null;
+      }
+      if (keepAliveGainRef.current) {
+        keepAliveGainRef.current.disconnect();
+        keepAliveGainRef.current = null;
+      }
+    } catch (e) {
+      console.warn("Could not stop Bluetooth keep-alive stream:", e);
+    }
+  }, []);
   
   const stopTimer = useCallback(() => {
     if (timerRef.current) {
@@ -63,7 +81,8 @@ export const useLucLeger = (
       timerRef.current = null;
     }
     startTimeRef.current = null;
-  }, []);
+    stopKeepAlive();
+  }, [stopKeepAlive]);
 
   useEffect(() => {
     if (testState === 'running') {
@@ -146,6 +165,36 @@ export const useLucLeger = (
     playBeep(audioContextRef.current);
     lastBeepSegmentIndexRef.current = 0;
     announcePalier(1, language);
+
+    // Dynamic Bluetooth Keep-Alive: start continuous sub-audible 15Hz frequency stream to prevent Bluetooth sleep state
+    if (audioContextRef.current) {
+        try {
+            if (keepAliveOscRef.current) {
+                keepAliveOscRef.current.stop();
+                keepAliveOscRef.current.disconnect();
+                keepAliveOscRef.current = null;
+            }
+            
+            const keepAliveOsc = audioContextRef.current.createOscillator();
+            const keepAliveGain = audioContextRef.current.createGain();
+            
+            keepAliveOsc.connect(keepAliveGain);
+            keepAliveGain.connect(audioContextRef.current.destination);
+            
+            // Sub-audible 15Hz frequency (below human hearing range, prevents Bluetooth audio chips from sleeping)
+            keepAliveOsc.frequency.setValueAtTime(15, audioContextRef.current.currentTime);
+            keepAliveOsc.type = 'sine';
+            
+            // Very low mathematical amplitude
+            keepAliveGain.gain.setValueAtTime(0.001, audioContextRef.current.currentTime);
+            
+            keepAliveOsc.start();
+            keepAliveOscRef.current = keepAliveOsc;
+            keepAliveGainRef.current = keepAliveGain;
+        } catch (e) {
+            console.warn("Could not start Bluetooth keep-alive background audio:", e);
+        }
+    }
 
     setTestState('running');
   }, [language]);
